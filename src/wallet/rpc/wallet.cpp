@@ -866,6 +866,9 @@ RPCHelpMan signrawtransactionwithwallet();
 // signmessage
 RPCHelpMan signmessage();
 
+// timestampdata
+RPCHelpMan timestampdata();
+
 // transactions
 RPCHelpMan listreceivedbyaddress();
 RPCHelpMan listreceivedbylabel();
@@ -935,6 +938,7 @@ Span<const CRPCCommand> GetWalletRPCCommands()
         {"wallet", &settxfee},
         {"wallet", &setwalletflag},
         {"wallet", &signmessage},
+        {"wallet", &timestampdata},
         {"wallet", &signrawtransactionwithwallet},
         {"wallet", &simulaterawtransaction},
         {"wallet", &sendall},
