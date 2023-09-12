@@ -19,6 +19,12 @@
 #include <wallet/rpc/util.h>
 #include <wallet/spend.h>
 #include <wallet/wallet.h>
+#include <util/message.h>
+#include <crypto/sha3.h>
+
+#include <filesystem>
+#include <fstream>
+#include <random>
 
 #include <univalue.h>
 
@@ -172,6 +178,36 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
     return tx->GetHash().GetHex();
 }
 
+    UniValue TimestampAndCommit(CWallet& wallet, const CCoinControl &coin_control, std::vector<CRecipient> &recipients, mapValue_t map_value, bool verbose)
+    {
+        EnsureWalletIsUnlocked(wallet);
+
+        // This function is only used by sendtoaddress and sendmany.
+        // This should always try to sign, if we don't have private keys, don't try to do anything here.
+        if (wallet.IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS)) {
+            throw JSONRPCError(RPC_WALLET_ERROR, "Error: Private keys are disabled for this wallet");
+        }
+
+        // Shuffle recipient list
+        std::shuffle(recipients.begin(), recipients.end(), FastRandomContext());
+
+        // Send
+        constexpr int RANDOM_CHANGE_POSITION = -1;
+        auto res = TimestampTransaction(wallet, recipients, RANDOM_CHANGE_POSITION, coin_control, true);
+        if (!res) {
+            throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, util::ErrorString(res).original);
+        }
+        const CTransactionRef& tx = res->tx;
+        wallet.CommitTransaction(tx, std::move(map_value), /*orderForm=*/{});
+        if (verbose) {
+            UniValue entry(UniValue::VOBJ);
+            entry.pushKV("txid", tx->GetHash().GetHex());
+            entry.pushKV("fee_reason", StringForFeeReason(res->fee_calc.reason));
+            return entry;
+        }
+        return tx->GetHash().GetHex();
+    }
+
 
 /**
  * Update coin control with fee estimation based on the given parameters
@@ -209,6 +245,99 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
         cc.m_confirm_target = ParseConfirmTarget(conf_target, wallet.chain().estimateMaxBlocks());
     }
 }
+
+    RPCHelpMan timestampdata()
+    {
+        return RPCHelpMan{"timestampdata",
+                          "\nTimestamp data using SHA3-256 and transaction signature randomizer" +
+                          HELP_REQUIRING_PASSPHRASE,
+                          {
+                                  {"filepath", RPCArg::Type::STR, RPCArg::Optional::NO, "The file to the path to use for timestamping."},
+                          },
+                          RPCResult{
+                                  RPCResult::Type::STR_HEX, "txid", "The timestamping transaction id."
+                          },
+                          RPCExamples{
+                                  "\nUnlock the wallet for 300 seconds\n"
+                                  + HelpExampleCli("walletpassphrase", "\"mypassphrase\" 300") +
+                                  "\nTimestamp a PDF document\n"
+                                  + HelpExampleCli("timestampdata", "\"/home/user/document.pdf\"") +
+                                  "\nTimestamp a PNG image\n"
+                                  + HelpExampleCli("timestampdata", "\"/home/user/image.png\"") +
+                                  "\nAs a JSON-RPC call\n"
+                                  + HelpExampleRpc("timestampdata", "\"/home/user/document.pdf\"")
+                          },
+                          [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+                          {
+                              const std::shared_ptr<CWallet> pwallet = GetWalletForJSONRPCRequest(request);
+                              if (!pwallet) return UniValue::VNULL;
+
+                              LOCK(pwallet->cs_wallet);
+
+                              EnsureWalletIsUnlocked(*pwallet);
+
+                              const double MIN_LIMIT = 0.00000001, MAX_LIMIT = 0.000001;
+
+                              std::string strFilePath = request.params[0].get_str();
+
+                              if (!std::filesystem::exists(strFilePath)) {
+                                  throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filepath");
+                              }
+
+                              if (!std::filesystem::is_regular_file(strFilePath)) {
+                                  throw JSONRPCError(RPC_INVALID_PARAMETER, "File is not regular");
+                              }
+
+                              std::ifstream file(strFilePath);
+                              std::ostringstream data;
+                              if (file) {
+                                  while (file) {
+                                      data << file.get();
+                                  }
+                              }
+
+                              auto bytes = ParseHex(data.str());
+                              SHA3_256 shaInstance;
+                              unsigned char hash[SHA3_256::OUTPUT_SIZE];
+                              shaInstance.Write(bytes).Finalize(hash);
+                              std::string dataHash = HexStr(hash);
+
+                              mapValue_t mapValue;
+                              bool fSubtractFeeFromAmount = false;
+                              CCoinControl coin_control;
+
+                              std::optional<OutputType> parsed = ParseOutputType("bech32m");
+                              const OutputType output_type = parsed.value();
+                              if (!pwallet->CanGetAddresses()) {
+                                  throw JSONRPCError(RPC_WALLET_ERROR, "Error: This wallet has no available keys");
+                              }
+                              const std::string label;
+                              auto op_dest = pwallet->GetNewDestination(output_type, label);
+
+                              if (!op_dest) {
+                                  throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, util::ErrorString(op_dest).original);
+                              }
+
+                              std::random_device rd;
+                              std::mt19937 generator(rd());
+                              std::uniform_real_distribution<> distribution(MIN_LIMIT, MAX_LIMIT);
+
+                              std::string newAddress = EncodeDestination(*op_dest);
+                              UniValue address_amounts(UniValue::VOBJ);
+                              address_amounts.pushKV(newAddress, distribution(generator));
+                              UniValue subtractFeeFromAmount(UniValue::VARR);
+                              if (fSubtractFeeFromAmount) {
+                                  subtractFeeFromAmount.push_back(newAddress);
+                              }
+
+                              std::vector<CRecipient> recipients;
+                              ParseRecipients(address_amounts, subtractFeeFromAmount, recipients);
+                              const bool verbose = false;
+
+                              return TimestampAndCommit(*pwallet, coin_control, recipients, mapValue, verbose);
+                          },
+        };
+    }
 
 RPCHelpMan sendtoaddress()
 {

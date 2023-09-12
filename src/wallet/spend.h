@@ -219,6 +219,13 @@ struct CreatedTransactionResult
 util::Result<CreatedTransactionResult> CreateTransaction(CWallet& wallet, const std::vector<CRecipient>& vecSend, int change_pos, const CCoinControl& coin_control, bool sign = true);
 
 /**
+ * Timestamp a data using a new transaction paying the recipients with a set of coins
+ * selected by SelectCoins(); Also create the change output, when needed
+ * @note passing change_pos as -1 will result in setting a random position
+ */
+util::Result<CreatedTransactionResult> TimestampTransaction(CWallet& wallet, const std::vector<CRecipient>& vecSend, int change_pos, const CCoinControl& coin_control, bool sign);
+
+/**
  * Insert additional inputs into the transaction by
  * calling CreateTransaction();
  */
