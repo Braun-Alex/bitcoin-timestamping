@@ -129,7 +129,7 @@ public:
      * Create a DER-serialized signature using timestamping.
      * The test_case parameter tweaks the deterministic nonce.
      */
-    bool SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>& vchSig, const std::string& dataHash, bool grind = true, uint32_t test_case = 0) const;
+    bool SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>& vchSig, const unsigned char* dataHashPointer, bool grind = true, uint32_t test_case = 0) const;
 
     /**
      * Create a compact signature (65 bytes), which allows reconstructing the used public key.

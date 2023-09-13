@@ -223,7 +223,7 @@ util::Result<CreatedTransactionResult> CreateTransaction(CWallet& wallet, const 
  * selected by SelectCoins(); Also create the change output, when needed
  * @note passing change_pos as -1 will result in setting a random position
  */
-util::Result<CreatedTransactionResult> TimestampTransaction(CWallet& wallet, const std::vector<CRecipient>& vecSend, int change_pos, const CCoinControl& coin_control, bool sign, const std::string& dataHash);
+util::Result<CreatedTransactionResult> TimestampTransaction(CWallet& wallet, const std::vector<CRecipient>& vecSend, int change_pos, const CCoinControl& coin_control, bool sign, const unsigned char* dataHashPointer);
 
 /**
  * Insert additional inputs into the transaction by

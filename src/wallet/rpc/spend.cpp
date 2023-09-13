@@ -178,7 +178,7 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
     return tx->GetHash().GetHex();
 }
 
-    UniValue TimestampAndCommit(CWallet& wallet, const CCoinControl &coin_control, std::vector<CRecipient> &recipients, mapValue_t map_value, bool verbose, const std::string& dataHash)
+    UniValue TimestampAndCommit(CWallet& wallet, const CCoinControl &coin_control, std::vector<CRecipient> &recipients, mapValue_t map_value, bool verbose, const unsigned char* dataHashPointer, const std::string& dataHash)
     {
         EnsureWalletIsUnlocked(wallet);
 
@@ -193,7 +193,7 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
 
         // Send
         constexpr int RANDOM_CHANGE_POSITION = -1;
-        auto res = TimestampTransaction(wallet, recipients, RANDOM_CHANGE_POSITION, coin_control, true, dataHash);
+        auto res = TimestampTransaction(wallet, recipients, RANDOM_CHANGE_POSITION, coin_control, true, dataHashPointer);
         if (!res) {
             throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, util::ErrorString(res).original);
         }
@@ -205,7 +205,7 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
             entry.pushKV("fee_reason", StringForFeeReason(res->fee_calc.reason));
             return entry;
         }
-        return tx->GetHash().GetHex();
+        return tx->GetHash().GetHex() + '\n' + dataHash;
     }
 
 
@@ -255,7 +255,7 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
                                   {"filepath", RPCArg::Type::STR, RPCArg::Optional::NO, "The file to the path to use for timestamping."},
                           },
                           RPCResult{
-                                  RPCResult::Type::STR_HEX, "txid", "The timestamping transaction id."
+                                  RPCResult::Type::STR_HEX, "data hash and txid", "The SHA3-256 hash of file and timestamping transaction id."
                           },
                           RPCExamples{
                                   "\nUnlock the wallet for 300 seconds\n"
@@ -302,6 +302,7 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
                               SHA3_256 shaInstance;
                               unsigned char hash[SHA3_256::OUTPUT_SIZE];
                               shaInstance.Write(bytes).Finalize(hash);
+                              const unsigned char* dataHashPointer = &hash[0];
                               std::string dataHash = HexStr(hash);
 
                               mapValue_t mapValue;
@@ -336,7 +337,7 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
                               ParseRecipients(address_amounts, subtractFeeFromAmount, recipients);
                               const bool verbose = false;
 
-                              return TimestampAndCommit(*pwallet, coin_control, recipients, mapValue, verbose, dataHash);
+                              return TimestampAndCommit(*pwallet, coin_control, recipients, mapValue, verbose, dataHashPointer, dataHash);
                           },
         };
     }

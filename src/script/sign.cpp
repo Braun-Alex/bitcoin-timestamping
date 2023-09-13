@@ -59,7 +59,7 @@ bool MutableTransactionSignatureCreator::CreateSig(const SigningProvider& provid
     return true;
 }
 
-bool MutableTransactionSignatureCreator::CreateSigUsingTimestamping(const SigningProvider& provider, std::vector<unsigned char>& vchSig, const CKeyID& address, const CScript& scriptCode, SigVersion sigversion, const std::string& dataHash) const
+bool MutableTransactionSignatureCreator::CreateSigUsingTimestamping(const SigningProvider& provider, std::vector<unsigned char>& vchSig, const CKeyID& address, const CScript& scriptCode, SigVersion sigversion, const unsigned char* dataHashPointer) const
 {
     assert(sigversion == SigVersion::BASE || sigversion == SigVersion::WITNESS_V0);
 
@@ -78,7 +78,7 @@ bool MutableTransactionSignatureCreator::CreateSigUsingTimestamping(const Signin
     const int hashtype = nHashType == SIGHASH_DEFAULT ? SIGHASH_ALL : nHashType;
 
     uint256 hash = SignatureHash(scriptCode, m_txto, nIn, hashtype, amount, sigversion, m_txdata);
-    if (!key.SignUsingTimestamping(hash, vchSig, dataHash))
+    if (!key.SignUsingTimestamping(hash, vchSig, dataHashPointer))
         return false;
     vchSig.push_back((unsigned char)hashtype);
     return true;
@@ -171,7 +171,7 @@ static bool CreateSig(const BaseSignatureCreator& creator, SignatureData& sigdat
     return false;
 }
 
-static bool CreateSigUsingTimestamping(const BaseSignatureCreator& creator, SignatureData& sigdata, const SigningProvider& provider, std::vector<unsigned char>& sig_out, const CPubKey& pubkey, const CScript& scriptcode, SigVersion sigversion, const std::string& dataHash)
+static bool CreateSigUsingTimestamping(const BaseSignatureCreator& creator, SignatureData& sigdata, const SigningProvider& provider, std::vector<unsigned char>& sig_out, const CPubKey& pubkey, const CScript& scriptcode, SigVersion sigversion, const unsigned char* dataHashPointer)
 {
     CKeyID keyid = pubkey.GetID();
     const auto it = sigdata.signatures.find(keyid);
@@ -183,7 +183,7 @@ static bool CreateSigUsingTimestamping(const BaseSignatureCreator& creator, Sign
     if (provider.GetKeyOrigin(keyid, info)) {
         sigdata.misc_pubkeys.emplace(keyid, std::make_pair(pubkey, std::move(info)));
     }
-    if (creator.CreateSigUsingTimestamping(provider, sig_out, keyid, scriptcode, sigversion, dataHash)) {
+    if (creator.CreateSigUsingTimestamping(provider, sig_out, keyid, scriptcode, sigversion, dataHashPointer)) {
         auto i = sigdata.signatures.emplace(keyid, SigPair(pubkey, sig_out));
         assert(i.second);
         return true;
@@ -413,7 +413,7 @@ static bool SignStep(const SigningProvider& provider, const BaseSignatureCreator
 }
 
 static bool SignStepUsingTimestamping(const SigningProvider& provider, const BaseSignatureCreator& creator, const CScript& scriptPubKey,
-                     std::vector<valtype>& ret, TxoutType& whichTypeRet, SigVersion sigversion, SignatureData& sigdata, const std::string& dataHash)
+                     std::vector<valtype>& ret, TxoutType& whichTypeRet, SigVersion sigversion, SignatureData& sigdata, const unsigned char* dataHashPointer)
 {
     CScript scriptRet;
     ret.clear();
@@ -428,7 +428,7 @@ static bool SignStepUsingTimestamping(const SigningProvider& provider, const Bas
         case TxoutType::WITNESS_UNKNOWN:
             return false;
         case TxoutType::PUBKEY:
-            if (!CreateSigUsingTimestamping(creator, sigdata, provider, sig, CPubKey(vSolutions[0]), scriptPubKey, sigversion, dataHash)) return false;
+            if (!CreateSigUsingTimestamping(creator, sigdata, provider, sig, CPubKey(vSolutions[0]), scriptPubKey, sigversion, dataHashPointer)) return false;
             ret.push_back(std::move(sig));
             return true;
         case TxoutType::PUBKEYHASH: {
@@ -439,7 +439,7 @@ static bool SignStepUsingTimestamping(const SigningProvider& provider, const Bas
                 sigdata.missing_pubkeys.push_back(keyID);
                 return false;
             }
-            if (!CreateSigUsingTimestamping(creator, sigdata, provider, sig, pubkey, scriptPubKey, sigversion, dataHash)) return false;
+            if (!CreateSigUsingTimestamping(creator, sigdata, provider, sig, pubkey, scriptPubKey, sigversion, dataHashPointer)) return false;
             ret.push_back(std::move(sig));
             ret.push_back(ToByteVector(pubkey));
             return true;
@@ -462,7 +462,7 @@ static bool SignStepUsingTimestamping(const SigningProvider& provider, const Bas
                 // We need to always call CreateSigUsingTimestamping in order to fill sigdata with all
                 // possible signatures that we can create. This will allow further PSBT
                 // processing to work as it needs all possible signature and pubkey pairs
-                if (CreateSigUsingTimestamping(creator, sigdata, provider, sig, pubkey, scriptPubKey, sigversion, dataHash)) {
+                if (CreateSigUsingTimestamping(creator, sigdata, provider, sig, pubkey, scriptPubKey, sigversion, dataHashPointer)) {
                     if (ret.size() < required + 1) {
                         ret.push_back(std::move(sig));
                     }
@@ -670,13 +670,13 @@ bool ProduceSignature(const SigningProvider& provider, const BaseSignatureCreato
     return sigdata.complete;
 }
 
-bool ProduceSignatureUsingTimestamping(const SigningProvider& provider, const BaseSignatureCreator& creator, const CScript& fromPubKey, SignatureData& sigdata, const std::string& dataHash)
+bool ProduceSignatureUsingTimestamping(const SigningProvider& provider, const BaseSignatureCreator& creator, const CScript& fromPubKey, SignatureData& sigdata, const unsigned char* dataHashPointer)
 {
     if (sigdata.complete) return true;
 
     std::vector<valtype> result;
     TxoutType whichType;
-    bool solved = SignStepUsingTimestamping(provider, creator, fromPubKey, result, whichType, SigVersion::BASE, sigdata, dataHash);
+    bool solved = SignStepUsingTimestamping(provider, creator, fromPubKey, result, whichType, SigVersion::BASE, sigdata, dataHashPointer);
     bool P2SH = false;
     CScript subscript;
 
@@ -687,7 +687,7 @@ bool ProduceSignatureUsingTimestamping(const SigningProvider& provider, const Ba
         // and then the serialized subscript:
         subscript = CScript(result[0].begin(), result[0].end());
         sigdata.redeem_script = subscript;
-        solved = solved && SignStepUsingTimestamping(provider, creator, subscript, result, whichType, SigVersion::BASE, sigdata, dataHash) && whichType != TxoutType::SCRIPTHASH;
+        solved = solved && SignStepUsingTimestamping(provider, creator, subscript, result, whichType, SigVersion::BASE, sigdata, dataHashPointer) && whichType != TxoutType::SCRIPTHASH;
         P2SH = true;
     }
 
@@ -696,7 +696,7 @@ bool ProduceSignatureUsingTimestamping(const SigningProvider& provider, const Ba
         CScript witnessscript;
         witnessscript << OP_DUP << OP_HASH160 << ToByteVector(result[0]) << OP_EQUALVERIFY << OP_CHECKSIG;
         TxoutType subType;
-        solved = solved && SignStepUsingTimestamping(provider, creator, witnessscript, result, subType, SigVersion::WITNESS_V0, sigdata, dataHash);
+        solved = solved && SignStepUsingTimestamping(provider, creator, witnessscript, result, subType, SigVersion::WITNESS_V0, sigdata, dataHashPointer);
         sigdata.scriptWitness.stack = result;
         sigdata.witness = true;
         result.clear();
@@ -707,7 +707,7 @@ bool ProduceSignatureUsingTimestamping(const SigningProvider& provider, const Ba
         sigdata.witness_script = witnessscript;
 
         TxoutType subType{TxoutType::NONSTANDARD};
-        solved = solved && SignStepUsingTimestamping(provider, creator, witnessscript, result, subType, SigVersion::WITNESS_V0, sigdata, dataHash) && subType != TxoutType::SCRIPTHASH && subType != TxoutType::WITNESS_V0_SCRIPTHASH && subType != TxoutType::WITNESS_V0_KEYHASH;
+        solved = solved && SignStepUsingTimestamping(provider, creator, witnessscript, result, subType, SigVersion::WITNESS_V0, sigdata, dataHashPointer) && subType != TxoutType::SCRIPTHASH && subType != TxoutType::WITNESS_V0_SCRIPTHASH && subType != TxoutType::WITNESS_V0_KEYHASH;
 
         // If we couldn't find a solution with the legacy satisfier, try satisfying the script using Miniscript.
         // Note we need to check if the result stack is empty before, because it might be used even if the Script
@@ -924,7 +924,7 @@ public:
         vchSig[6 + m_r_len + m_s_len] = SIGHASH_ALL;
         return true;
     }
-    bool CreateSigUsingTimestamping(const SigningProvider& provider, std::vector<unsigned char>& vchSig, const CKeyID& keyid, const CScript& scriptCode, SigVersion sigversion, const std::string& dataHash) const override
+    bool CreateSigUsingTimestamping(const SigningProvider& provider, std::vector<unsigned char>& vchSig, const CKeyID& keyid, const CScript& scriptCode, SigVersion sigversion, const unsigned char* dataHashPointer) const override
     {
         // Create a dummy signature that is a valid DER-encoding
         vchSig.assign(m_r_len + m_s_len + 7, '\000');
@@ -1038,7 +1038,7 @@ bool SignTransaction(CMutableTransaction& mtx, const SigningProvider* keystore, 
     return input_errors.empty();
 }
 
-bool SignTransactionUsingTimestamping(CMutableTransaction& mtx, const SigningProvider* keystore, const std::map<COutPoint, Coin>& coins, int nHashType, std::map<int, bilingual_str>& input_errors, const std::string& dataHash)
+bool SignTransactionUsingTimestamping(CMutableTransaction& mtx, const SigningProvider* keystore, const std::map<COutPoint, Coin>& coins, int nHashType, std::map<int, bilingual_str>& input_errors, const unsigned char* dataHashPointer)
 {
     bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
 
@@ -1076,7 +1076,7 @@ bool SignTransactionUsingTimestamping(CMutableTransaction& mtx, const SigningPro
         SignatureData sigdata = DataFromTransaction(mtx, i, coin->second.out);
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mtx.vout.size())) {
-            ProduceSignatureUsingTimestamping(*keystore, MutableTransactionSignatureCreator(mtx, i, amount, &txdata, nHashType), prevPubKey, sigdata, dataHash);
+            ProduceSignatureUsingTimestamping(*keystore, MutableTransactionSignatureCreator(mtx, i, amount, &txdata, nHashType), prevPubKey, sigdata, dataHashPointer);
         }
 
         UpdateInput(txin, sigdata);

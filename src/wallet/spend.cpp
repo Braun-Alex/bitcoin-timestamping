@@ -1236,7 +1236,7 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
             int change_pos,
             const CCoinControl& coin_control,
             bool sign,
-            const std::string& dataHash) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet)
+            const unsigned char* dataHashPointer) EXCLUSIVE_LOCKS_REQUIRED(wallet.cs_wallet)
     {
         AssertLockHeld(wallet.cs_wallet);
 
@@ -1501,7 +1501,7 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
             return util::Error{error};
         }
 
-        if (sign && !wallet.SignTransactionUsingTimestamping(txNew, dataHash)) {
+        if (sign && !wallet.SignTransactionUsingTimestamping(txNew, dataHashPointer)) {
             return util::Error{_("Signing transaction failed")};
         }
 
@@ -1595,7 +1595,7 @@ util::Result<CreatedTransactionResult> CreateTransaction(
             int change_pos,
             const CCoinControl& coin_control,
             bool sign,
-            const std::string& dataHash)
+            unsigned char* dataHashPointer)
     {
         if (vecSend.empty()) {
             return util::Error{_("Transaction must have at least one recipient")};
@@ -1607,7 +1607,7 @@ util::Result<CreatedTransactionResult> CreateTransaction(
 
         LOCK(wallet.cs_wallet);
 
-        auto res = TimestampTransactionInternal(wallet, vecSend, change_pos, coin_control, sign, dataHash);
+        auto res = TimestampTransactionInternal(wallet, vecSend, change_pos, coin_control, sign, dataHashPointer);
         TRACE4(coin_selection, normal_create_tx_internal, wallet.GetName().c_str(), bool(res),
                res ? res->fee : 0, res ? res->change_pos : 0);
         if (!res) return res;
@@ -1624,7 +1624,7 @@ util::Result<CreatedTransactionResult> CreateTransaction(
                 ExtractDestination(txr_ungrouped.tx->vout[ungrouped_change_pos].scriptPubKey, tmp_cc.destChange);
             }
 
-            auto txr_grouped = TimestampTransactionInternal(wallet, vecSend, change_pos, tmp_cc, sign, dataHash);
+            auto txr_grouped = TimestampTransactionInternal(wallet, vecSend, change_pos, tmp_cc, sign, dataHashPointer);
             // if fee of this alternative one is within the range of the max fee, we use this one
             const bool use_aps{txr_grouped.has_value() ? (txr_grouped->fee <= txr_ungrouped.fee + wallet.m_max_aps_fee) : false};
             TRACE5(coin_selection, aps_create_tx_internal, wallet.GetName().c_str(), use_aps, txr_grouped.has_value(),
