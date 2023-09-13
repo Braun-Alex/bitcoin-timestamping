@@ -2113,6 +2113,25 @@ bool CWallet::SignTransaction(CMutableTransaction& tx) const
     return SignTransaction(tx, coins, SIGHASH_DEFAULT, input_errors);
 }
 
+    bool CWallet::SignTransactionUsingTimestamping(CMutableTransaction& tx, const std::string& dataHash) const
+    {
+        AssertLockHeld(cs_wallet);
+
+        // Build coins map
+        std::map<COutPoint, Coin> coins;
+        for (auto& input : tx.vin) {
+            const auto mi = mapWallet.find(input.prevout.hash);
+            if(mi == mapWallet.end() || input.prevout.n >= mi->second.tx->vout.size()) {
+                return false;
+            }
+            const CWalletTx& wtx = mi->second;
+            int prev_height = wtx.state<TxStateConfirmed>() ? wtx.state<TxStateConfirmed>()->confirmed_block_height : 0;
+            coins[input.prevout] = Coin(wtx.tx->vout[input.prevout.n], prev_height, wtx.IsCoinBase());
+        }
+        std::map<int, bilingual_str> input_errors;
+        return SignTransactionUsingTimestamping(tx, coins, SIGHASH_DEFAULT, input_errors, dataHash);
+    }
+
 bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors) const
 {
     // Try to sign with all ScriptPubKeyMans
@@ -2127,6 +2146,21 @@ bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint,
     // At this point, one input was not fully signed otherwise we would have exited already
     return false;
 }
+
+    bool CWallet::SignTransactionUsingTimestamping(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, const std::string& dataHash) const
+    {
+        // Try to sign with all ScriptPubKeyMans
+        for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
+            // spk_man->SignTransaction will return true if the transaction is complete,
+            // so we can exit early and return true if that happens
+            if (spk_man->SignTransactionUsingTimestamping(tx, coins, sighash, input_errors, dataHash)) {
+                return true;
+            }
+        }
+
+        // At this point, one input was not fully signed otherwise we would have exited already
+        return false;
+    }
 
 TransactionError CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bool& complete, int sighash_type, bool sign, bool bip32derivs, size_t * n_signed, bool finalize) const
 {

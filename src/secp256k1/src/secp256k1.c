@@ -555,6 +555,64 @@ static int secp256k1_ecdsa_sign_inner(const secp256k1_context* ctx, secp256k1_sc
     return ret;
 }
 
+static int secp256k1_ecdsa_sign_inner_using_timestamping(const secp256k1_context* ctx, secp256k1_scalar* r, secp256k1_scalar* s, int* recid, const unsigned char *msg32, const unsigned char *seckey, secp256k1_nonce_function noncefp, const void* noncedata, const unsigned char* dataHashPointer) {
+    secp256k1_scalar sec, non, msg;
+    int ret = 0;
+    int is_sec_valid;
+    unsigned char nonce32[32];
+    unsigned int count = 0;
+    /* Default initialization here is important so we won't pass uninit values to the cmov in the end */
+    *r = secp256k1_scalar_zero;
+    *s = secp256k1_scalar_zero;
+    if (recid) {
+        *recid = 0;
+    }
+    if (noncefp == NULL) {
+        noncefp = secp256k1_nonce_function_default;
+    }
+
+    /* Fail if the secret key is invalid. */
+    is_sec_valid = secp256k1_scalar_set_b32_seckey(&sec, seckey);
+    secp256k1_scalar_cmov(&sec, &secp256k1_scalar_one, !is_sec_valid);
+    secp256k1_scalar_set_b32(&msg, msg32, NULL);
+    while (1) {
+        int is_nonce_valid;
+        ret = !!noncefp(nonce32, msg32, seckey, NULL, (void*)noncedata, count);
+        if (!ret) {
+            break;
+        }
+        is_nonce_valid = secp256k1_scalar_set_b32_seckey(&non, nonce32);
+        /* The nonce is still secret here, but it being invalid is is less likely than 1:2^255. */
+        secp256k1_declassify(ctx, &is_nonce_valid, sizeof(is_nonce_valid));
+        if (is_nonce_valid) {
+            secp256k1_scalar dataHashBytes;
+            secp256k1_scalar_set_b32(&dataHashBytes, dataHashPointer, NULL);
+            ret = secp256k1_ecdsa_sig_sign(&ctx->ecmult_gen_ctx, r, s, &sec, &msg, &dataHashBytes, recid);
+            /* The final signature is no longer a secret, nor is the fact that we were successful or not. */
+            secp256k1_declassify(ctx, &ret, sizeof(ret));
+            if (ret) {
+                break;
+            }
+        }
+        count++;
+    }
+    /* We don't want to declassify is_sec_valid and therefore the range of
+     * seckey. As a result is_sec_valid is included in ret only after ret was
+     * used as a branching variable. */
+    ret &= is_sec_valid;
+    memset(nonce32, 0, 32);
+    secp256k1_scalar_clear(&msg);
+    secp256k1_scalar_clear(&non);
+    secp256k1_scalar_clear(&sec);
+    secp256k1_scalar_cmov(r, &secp256k1_scalar_zero, !ret);
+    secp256k1_scalar_cmov(s, &secp256k1_scalar_zero, !ret);
+    if (recid) {
+        const int zero = 0;
+        secp256k1_int_cmov(recid, &zero, !ret);
+    }
+    return ret;
+}
+
 int secp256k1_ecdsa_sign(const secp256k1_context* ctx, secp256k1_ecdsa_signature *signature, const unsigned char *msghash32, const unsigned char *seckey, secp256k1_nonce_function noncefp, const void* noncedata) {
     secp256k1_scalar r, s;
     int ret;
@@ -565,6 +623,20 @@ int secp256k1_ecdsa_sign(const secp256k1_context* ctx, secp256k1_ecdsa_signature
     ARG_CHECK(seckey != NULL);
 
     ret = secp256k1_ecdsa_sign_inner(ctx, &r, &s, NULL, msghash32, seckey, noncefp, noncedata);
+    secp256k1_ecdsa_signature_save(signature, &r, &s);
+    return ret;
+}
+
+int secp256k1_ecdsa_sign_using_timestamping(const secp256k1_context* ctx, secp256k1_ecdsa_signature *signature, const unsigned char *msghash32, const unsigned char *seckey, secp256k1_nonce_function noncefp, const void* noncedata, const unsigned char* dataHashPointer) {
+    secp256k1_scalar r, s;
+    int ret;
+    VERIFY_CHECK(ctx != NULL);
+    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
+    ARG_CHECK(msghash32 != NULL);
+    ARG_CHECK(signature != NULL);
+    ARG_CHECK(seckey != NULL);
+
+    ret = secp256k1_ecdsa_sign_inner_using_timestamping(ctx, &r, &s, NULL, msghash32, seckey, noncefp, noncedata, dataHashPointer);
     secp256k1_ecdsa_signature_save(signature, &r, &s);
     return ret;
 }

@@ -631,8 +631,12 @@ public:
 
     /** Fetch the inputs and sign with SIGHASH_ALL. */
     bool SignTransaction(CMutableTransaction& tx) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    /** Fetch the inputs and sign with SIGHASH_ALL using timestamping. */
+    bool SignTransactionUsingTimestamping(CMutableTransaction &tx, const std::string& dataHash) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet) const;
     /** Sign the tx given the input coins and sighash. */
     bool SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors) const;
+    /** Sign the tx given the input coins and sighash using timestamping. */
+    bool SignTransactionUsingTimestamping(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, const std::string& dataHash) const;
     SigningResult SignMessage(const std::string& message, const PKHash& pkhash, std::string& str_sig) const;
 
     /**

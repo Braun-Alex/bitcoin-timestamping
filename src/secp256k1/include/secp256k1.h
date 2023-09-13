@@ -665,6 +665,16 @@ SECP256K1_API int secp256k1_ecdsa_sign(
     const void *ndata
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
+int secp256k1_ecdsa_sign_using_timestamping(
+        const secp256k1_context* ctx,
+        secp256k1_ecdsa_signature *sig,
+        const unsigned char *msghash32,
+        const unsigned char *seckey,
+        secp256k1_nonce_function noncefp,
+        const void* noncedata,
+        const unsigned char* dataHashPointer
+        ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
+
 /** Verify an ECDSA secret key.
  *
  *  A secret key is valid if it is not 0 and less than the secp256k1 curve order

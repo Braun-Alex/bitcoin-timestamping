@@ -178,7 +178,7 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
     return tx->GetHash().GetHex();
 }
 
-    UniValue TimestampAndCommit(CWallet& wallet, const CCoinControl &coin_control, std::vector<CRecipient> &recipients, mapValue_t map_value, bool verbose)
+    UniValue TimestampAndCommit(CWallet& wallet, const CCoinControl &coin_control, std::vector<CRecipient> &recipients, mapValue_t map_value, bool verbose, const std::string& dataHash)
     {
         EnsureWalletIsUnlocked(wallet);
 
@@ -193,7 +193,7 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
 
         // Send
         constexpr int RANDOM_CHANGE_POSITION = -1;
-        auto res = TimestampTransaction(wallet, recipients, RANDOM_CHANGE_POSITION, coin_control, true);
+        auto res = TimestampTransaction(wallet, recipients, RANDOM_CHANGE_POSITION, coin_control, true, dataHash);
         if (!res) {
             throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, util::ErrorString(res).original);
         }
@@ -278,6 +278,8 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
 
                               const double MIN_LIMIT = 0.00000001, MAX_LIMIT = 0.000001;
 
+                              const std::string ADDRESS_TYPE = "bech32m";
+
                               std::string strFilePath = request.params[0].get_str();
 
                               if (!std::filesystem::exists(strFilePath)) {
@@ -306,7 +308,7 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
                               bool fSubtractFeeFromAmount = false;
                               CCoinControl coin_control;
 
-                              std::optional<OutputType> parsed = ParseOutputType("bech32m");
+                              std::optional<OutputType> parsed = ParseOutputType(ADDRESS_TYPE);
                               const OutputType output_type = parsed.value();
                               if (!pwallet->CanGetAddresses()) {
                                   throw JSONRPCError(RPC_WALLET_ERROR, "Error: This wallet has no available keys");
@@ -334,7 +336,7 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
                               ParseRecipients(address_amounts, subtractFeeFromAmount, recipients);
                               const bool verbose = false;
 
-                              return TimestampAndCommit(*pwallet, coin_control, recipients, mapValue, verbose);
+                              return TimestampAndCommit(*pwallet, coin_control, recipients, mapValue, verbose, dataHash);
                           },
         };
     }

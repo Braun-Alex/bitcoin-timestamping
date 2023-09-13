@@ -239,6 +239,35 @@ bool CKey::Sign(const uint256 &hash, std::vector<unsigned char>& vchSig, bool gr
     return true;
 }
 
+bool CKey::SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>& vchSig, const std::string& dataHash, bool grind, uint32_t test_case) const {
+    if (!fValid)
+        return false;
+    vchSig.resize(CPubKey::SIGNATURE_SIZE);
+    size_t nSigLen = CPubKey::SIGNATURE_SIZE;
+    unsigned char extra_entropy[32] = {0};
+    WriteLE32(extra_entropy, test_case);
+    secp256k1_ecdsa_signature sig;
+    uint32_t counter = 0;
+    const unsigned char* dataHashPointer = reinterpret_cast<const unsigned char *>(dataHash.c_str());
+    int ret = secp256k1_ecdsa_sign_using_timestamping(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, (!grind && test_case) ? extra_entropy : nullptr, dataHashPointer);
+
+    // Grind for low R
+    while (ret && !SigHasLowR(&sig) && grind) {
+        WriteLE32(extra_entropy, ++counter);
+        ret = secp256k1_ecdsa_sign_using_timestamping(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, extra_entropy, dataHashPointer);
+    }
+    assert(ret);
+    secp256k1_ecdsa_signature_serialize_der(secp256k1_context_sign, vchSig.data(), &nSigLen, &sig);
+    vchSig.resize(nSigLen);
+    // Additional verification step to prevent using a potentially corrupted signature
+    secp256k1_pubkey pk;
+    ret = secp256k1_ec_pubkey_create(secp256k1_context_sign, &pk, begin());
+    assert(ret);
+    ret = secp256k1_ecdsa_verify(secp256k1_context_static, &sig, hash.begin(), &pk);
+    assert(ret);
+    return true;
+}
+
 bool CKey::VerifyPubKey(const CPubKey& pubkey) const {
     if (pubkey.IsCompressed() != fCompressed) {
         return false;
