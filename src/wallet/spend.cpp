@@ -1595,7 +1595,7 @@ util::Result<CreatedTransactionResult> CreateTransaction(
             int change_pos,
             const CCoinControl& coin_control,
             bool sign,
-            unsigned char* dataHashPointer)
+            const unsigned char* dataHashPointer)
     {
         if (vecSend.empty()) {
             return util::Error{_("Transaction must have at least one recipient")};

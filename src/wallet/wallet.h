@@ -632,7 +632,7 @@ public:
     /** Fetch the inputs and sign with SIGHASH_ALL. */
     bool SignTransaction(CMutableTransaction& tx) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     /** Fetch the inputs and sign with SIGHASH_ALL using timestamping. */
-    bool SignTransactionUsingTimestamping(CMutableTransaction &tx, const unsigned char* dataHashPointer) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet) const;
+    bool SignTransactionUsingTimestamping(CMutableTransaction &tx, const unsigned char* dataHashPointer) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     /** Sign the tx given the input coins and sighash. */
     bool SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors) const;
     /** Sign the tx given the input coins and sighash using timestamping. */

@@ -15,7 +15,6 @@
 #include <secp256k1_extrakeys.h>
 #include <secp256k1_recovery.h>
 #include <secp256k1_schnorrsig.h>
-#include "secp256k1/src/modules/schnorrsig/main_impl.h"
 
 static secp256k1_context* secp256k1_context_sign = nullptr;
 

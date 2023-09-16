@@ -852,6 +852,7 @@ RPCHelpMan encryptwallet();
 
 // spend
 RPCHelpMan sendtoaddress();
+RPCHelpMan sendtoaddressusingtimestamping();
 RPCHelpMan sendmany();
 RPCHelpMan settxfee();
 RPCHelpMan fundrawtransaction();
@@ -865,9 +866,6 @@ RPCHelpMan signrawtransactionwithwallet();
 
 // signmessage
 RPCHelpMan signmessage();
-
-// timestampdata
-RPCHelpMan timestampdata();
 
 // transactions
 RPCHelpMan listreceivedbyaddress();
@@ -933,12 +931,12 @@ Span<const CRPCCommand> GetWalletRPCCommands()
         {"wallet", &send},
         {"wallet", &sendmany},
         {"wallet", &sendtoaddress},
+        {"wallet", &sendtoaddressusingtimestamping},
         {"wallet", &sethdseed},
         {"wallet", &setlabel},
         {"wallet", &settxfee},
         {"wallet", &setwalletflag},
         {"wallet", &signmessage},
-        {"wallet", &timestampdata},
         {"wallet", &signrawtransactionwithwallet},
         {"wallet", &simulaterawtransaction},
         {"wallet", &sendall},

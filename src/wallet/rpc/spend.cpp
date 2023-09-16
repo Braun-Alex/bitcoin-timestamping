@@ -178,7 +178,7 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
     return tx->GetHash().GetHex();
 }
 
-    UniValue TimestampAndCommit(CWallet& wallet, const CCoinControl &coin_control, std::vector<CRecipient> &recipients, mapValue_t map_value, bool verbose, const unsigned char* dataHashPointer, const std::string& dataHash)
+    UniValue TimestampAndCommit(CWallet& wallet, const CCoinControl &coin_control, std::vector<CRecipient> &recipients, mapValue_t map_value, bool verbose, const unsigned char* dataHashPointer)
     {
         EnsureWalletIsUnlocked(wallet);
 
@@ -205,7 +205,7 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
             entry.pushKV("fee_reason", StringForFeeReason(res->fee_calc.reason));
             return entry;
         }
-        return tx->GetHash().GetHex() + '\n' + dataHash;
+        return tx->GetHash().GetHex();
     }
 
 
@@ -246,98 +246,114 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
     }
 }
 
-    RPCHelpMan timestampdata()
+    RPCHelpMan sendtoaddressusingtimestamping()
     {
-        return RPCHelpMan{"timestampdata",
-                          "\nTimestamp data using SHA3-256 and transaction signature randomizer" +
+        return RPCHelpMan{"sendtoaddressusingtimestamping",
+                          "\nSend an amount to a given address and timestamp a 256-bit hash of the data using transaction signature randomizer." +
                           HELP_REQUIRING_PASSPHRASE,
                           {
-                                  {"filepath", RPCArg::Type::STR, RPCArg::Optional::NO, "The file to the path to use for timestamping."},
+                                  {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The bitcoin address to send to."},
+                                  {"amount", RPCArg::Type::AMOUNT, RPCArg::Optional::NO, "The amount in " + CURRENCY_UNIT + " to send. eg 0.1"},
+                                  {"data_hash", RPCArg::Type::STR, RPCArg::Optional::NO, "A 256-bit hash of the data."},
+                                  {"comment", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "A comment used to store what the transaction is for.\n"
+                                                                                            "This is not part of the transaction, just kept in your wallet."},
+                                  {"comment_to", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "A comment to store the name of the person or organization\n"
+                                                                                               "to which you're sending the transaction. This is not part of the \n"
+                                                                                               "transaction, just kept in your wallet."},
+                                  {"subtractfeefromamount", RPCArg::Type::BOOL, RPCArg::Default{false}, "The fee will be deducted from the amount being sent.\n"
+                                                                                                        "The recipient will receive less bitcoins than you enter in the amount field."},
+                                  {"replaceable", RPCArg::Type::BOOL, RPCArg::DefaultHint{"wallet default"}, "Signal that this transaction can be replaced by a transaction (BIP 125)"},
+                                  {"conf_target", RPCArg::Type::NUM, RPCArg::DefaultHint{"wallet -txconfirmtarget"}, "Confirmation target in blocks"},
+                                  {"estimate_mode", RPCArg::Type::STR, RPCArg::Default{"unset"}, "The fee estimate mode, must be one of (case insensitive):\n"
+                                                                                                 "\"" + FeeModes("\"\n\"") + "\""},
+                                  {"avoid_reuse", RPCArg::Type::BOOL, RPCArg::Default{true}, "(only available if avoid_reuse wallet flag is set) Avoid spending from dirty addresses; addresses are considered\n"
+                                                                                             "dirty if they have previously been used in a transaction. If true, this also activates avoidpartialspends, grouping outputs by their addresses."},
+                                  {"fee_rate", RPCArg::Type::AMOUNT, RPCArg::DefaultHint{"not set, fall back to wallet fee estimation"}, "Specify a fee rate in " + CURRENCY_ATOM + "/vB."},
+                                  {"verbose", RPCArg::Type::BOOL, RPCArg::Default{false}, "If true, return extra information about the transaction."},
                           },
-                          RPCResult{
-                                  RPCResult::Type::STR_HEX, "data hash and txid", "The SHA3-256 hash of file and timestamping transaction id."
+                          {
+                                  RPCResult{"if verbose is not set or set to false",
+                                            RPCResult::Type::STR_HEX, "txid", "The transaction id."
+                                  },
+                                  RPCResult{"if verbose is set to true",
+                                            RPCResult::Type::OBJ, "", "",
+                                            {
+                                                    {RPCResult::Type::STR_HEX, "txid", "The transaction id."},
+                                                    {RPCResult::Type::STR, "fee_reason", "The transaction fee reason."}
+                                            },
+                                  },
                           },
                           RPCExamples{
                                   "\nUnlock the wallet for 300 seconds\n"
                                   + HelpExampleCli("walletpassphrase", "\"mypassphrase\" 300") +
-                                  "\nTimestamp a PDF document\n"
-                                  + HelpExampleCli("timestampdata", "\"/home/user/document.pdf\"") +
-                                  "\nTimestamp a PNG image\n"
-                                  + HelpExampleCli("timestampdata", "\"/home/user/image.png\"") +
-                                  "\nAs a JSON-RPC call\n"
-                                  + HelpExampleRpc("timestampdata", "\"/home/user/document.pdf\"")
+                                  "\nSend 0.1 BTC using timestamping\n"
+                                  + HelpExampleCli("sendtoaddressusingtimestamping", "\"" + EXAMPLE_ADDRESS[0] + "\" 0.1" + "\"526a3a08017f9588407ce545b97b8fffb8cabf29ad5f87f1b36db95e86aaaebc\"") +
+                                  "\nSend 0.1 BTC using timestamping with a confirmation target of 6 blocks in economical fee estimate mode using positional arguments\n"
+                                  + HelpExampleCli("sendtoaddressusingtimestamping", "\"" + EXAMPLE_ADDRESS[0] + "\" 0.1 \"4fba0579e4e205491bd6ef2146234961dfea40954f9fd4f8c41020e51203b09c\" \"donation\" \"sean's outpost\" false true 6 economical") +
+                                  "\nSend 0.1 BTC using timestamping with a fee rate of 1.1 " + CURRENCY_ATOM + "/vB, subtract fee from amount, BIP125-replaceable, using positional arguments\n"
+                                  + HelpExampleCli("sendtoaddressusingtimestamping", "\"" + EXAMPLE_ADDRESS[0] + "\" 0.1 \"72614cd57422acbf7d12cf132919760e496bc74747d8b0723a28f7cbf4043adc\" \"drinks\" \"room77\" true true null \"unset\" null 1.1") +
+                                  "\nSend 0.3 BTC with a confirmation target of 6 blocks in economical fee estimate mode using named arguments\n"
+                                  + HelpExampleCli("-named sendtoaddressusingtimestamping", "address=\"" + EXAMPLE_ADDRESS[0] + "\" amount=0.3 data_hash=\"de265aebb8c96bd81275975c7c4bd758ba668fe944a8a0fd68d6ac3f3a6d074e\" conf_target=6 estimate_mode=\"economical\"") +
+                                  "\nSend 0.5 BTC with a fee rate of 25 " + CURRENCY_ATOM + "/vB using named arguments\n"
+                                  + HelpExampleCli("-named sendtoaddressusingtimestamping", "address=\"" + EXAMPLE_ADDRESS[0] + "\" amount=0.5 data_hash=\"5fe72fe1528d1c966ad1a3ade225fe95cedac1a6ea849f0a753aecad449facce\" fee_rate=25")
+                                  + HelpExampleCli("-named sendtoaddressusingtimestamping", "address=\"" + EXAMPLE_ADDRESS[0] + "\" amount=0.5 data_hash=\"5fe72fe1528d1c966ad1a3ade225fe95cedac1a6ea849f0a753aecad449facce\" fee_rate=25 subtractfeefromamount=false replaceable=true avoid_reuse=true comment=\"2 pizzas\" comment_to=\"jeremy\" verbose=true")
                           },
                           [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
                           {
-                              const std::shared_ptr<CWallet> pwallet = GetWalletForJSONRPCRequest(request);
+                              std::shared_ptr<CWallet> const pwallet = GetWalletForJSONRPCRequest(request);
                               if (!pwallet) return UniValue::VNULL;
+
+                              // Make sure the results are valid at least up to the most recent block
+                              // the user could have gotten from another RPC command prior to now
+                              pwallet->BlockUntilSyncedToCurrentChain();
 
                               LOCK(pwallet->cs_wallet);
 
+                              // Wallet comments
+                              mapValue_t mapValue;
+                              if (!request.params[3].isNull() && !request.params[3].get_str().empty())
+                                  mapValue["comment"] = request.params[3].get_str();
+                              if (!request.params[4].isNull() && !request.params[4].get_str().empty())
+                                  mapValue["to"] = request.params[4].get_str();
+
+                              bool fSubtractFeeFromAmount = false;
+                              if (!request.params[5].isNull()) {
+                                  fSubtractFeeFromAmount = request.params[5].get_bool();
+                              }
+
+                              CCoinControl coin_control;
+                              if (!request.params[6].isNull()) {
+                                  coin_control.m_signal_bip125_rbf = request.params[6].get_bool();
+                              }
+
+                              coin_control.m_avoid_address_reuse = GetAvoidReuseFlag(*pwallet, request.params[9]);
+                              // We also enable partial spend avoidance if reuse avoidance is set.
+                              coin_control.m_avoid_partial_spends |= coin_control.m_avoid_address_reuse;
+
+                              SetFeeEstimateMode(*pwallet, coin_control, /*conf_target=*/request.params[7], /*estimate_mode=*/request.params[8], /*fee_rate=*/request.params[10], /*override_min_fee=*/false);
+
                               EnsureWalletIsUnlocked(*pwallet);
 
-                              const double MIN_LIMIT = 0.00000001, MAX_LIMIT = 0.000001;
-
-                              const std::string ADDRESS_TYPE = "bech32m";
-
-                              std::string strFilePath = request.params[0].get_str();
-
-                              if (!std::filesystem::exists(strFilePath)) {
-                                  throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid filepath");
-                              }
-
-                              if (!std::filesystem::is_regular_file(strFilePath)) {
-                                  throw JSONRPCError(RPC_INVALID_PARAMETER, "File is not regular");
-                              }
-
-                              std::ifstream file(strFilePath);
-                              std::ostringstream data;
-                              if (file) {
-                                  while (file) {
-                                      data << file.get();
-                                  }
-                              }
-
-                              auto bytes = ParseHex(data.str());
-                              SHA3_256 shaInstance;
-                              unsigned char hash[SHA3_256::OUTPUT_SIZE];
-                              shaInstance.Write(bytes).Finalize(hash);
-                              const unsigned char* dataHashPointer = &hash[0];
-                              std::string dataHash = HexStr(hash);
-
-                              mapValue_t mapValue;
-                              bool fSubtractFeeFromAmount = false;
-                              CCoinControl coin_control;
-
-                              std::optional<OutputType> parsed = ParseOutputType(ADDRESS_TYPE);
-                              const OutputType output_type = parsed.value();
-                              if (!pwallet->CanGetAddresses()) {
-                                  throw JSONRPCError(RPC_WALLET_ERROR, "Error: This wallet has no available keys");
-                              }
-                              const std::string label;
-                              auto op_dest = pwallet->GetNewDestination(output_type, label);
-
-                              if (!op_dest) {
-                                  throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, util::ErrorString(op_dest).original);
-                              }
-
-                              std::random_device rd;
-                              std::mt19937 generator(rd());
-                              std::uniform_real_distribution<> distribution(MIN_LIMIT, MAX_LIMIT);
-
-                              std::string newAddress = EncodeDestination(*op_dest);
+                              const int HASH_SIZE = 64;
                               UniValue address_amounts(UniValue::VOBJ);
-                              address_amounts.pushKV(newAddress, distribution(generator));
+                              const std::string address = request.params[0].get_str();
+                              address_amounts.pushKV(address, request.params[1]);
+                              const std::string data = request.params[2].get_str();
+                              if (data.size() != HASH_SIZE) {
+                                  throw JSONRPCError(RPC_INVALID_PARAMETER, "The invalid data hash");
+                              }
+                              const auto dataHash = ParseHex(data);
+                              const unsigned char* dataHashPointer = dataHash.data();
                               UniValue subtractFeeFromAmount(UniValue::VARR);
                               if (fSubtractFeeFromAmount) {
-                                  subtractFeeFromAmount.push_back(newAddress);
+                                  subtractFeeFromAmount.push_back(address);
                               }
 
                               std::vector<CRecipient> recipients;
                               ParseRecipients(address_amounts, subtractFeeFromAmount, recipients);
-                              const bool verbose = false;
+                              const bool verbose{request.params[11].isNull() ? false : request.params[11].get_bool()};
 
-                              return TimestampAndCommit(*pwallet, coin_control, recipients, mapValue, verbose, dataHashPointer, dataHash);
+                              return TimestampAndCommit(*pwallet, coin_control, recipients, mapValue, verbose, dataHashPointer);
                           },
         };
     }
