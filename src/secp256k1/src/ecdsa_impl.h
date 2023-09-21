@@ -262,6 +262,22 @@ static int secp256k1_ecdsa_sig_verify(const secp256k1_scalar *sigr, const secp25
 #endif
 }
 
+static int secp256k1_ecdsa_verify_timestamped_r(const secp256k1_ecmult_gen_context* ctx, const secp256k1_scalar* k, const secp256k1_scalar* expectedR) {
+    unsigned char bytes[32];
+    secp256k1_gej rp;
+    secp256k1_ge r;
+    secp256k1_scalar sigr;
+    int overflow = 0;
+
+    secp256k1_ecmult_gen(ctx, &rp, k);
+    secp256k1_ge_set_gej(&r, &rp);
+    secp256k1_fe_normalize(&r.x);
+    secp256k1_fe_normalize(&r.y);
+    secp256k1_fe_get_b32(bytes, &r.x);
+    secp256k1_scalar_set_b32(&sigr, bytes, &overflow);
+    return secp256k1_scalar_eq(&sigr, expectedR);
+}
+
 static int secp256k1_ecdsa_sig_sign(const secp256k1_ecmult_gen_context *ctx, secp256k1_scalar *sigr, secp256k1_scalar *sigs, const secp256k1_scalar *seckey, const secp256k1_scalar *message, const secp256k1_scalar *nonce, int *recid) {
     unsigned char b[32];
     secp256k1_gej rp;

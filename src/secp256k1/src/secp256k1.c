@@ -641,6 +641,14 @@ int secp256k1_ecdsa_sign_using_timestamping(const secp256k1_context* ctx, secp25
     return ret;
 }
 
+int secp256k1_ecdsa_verify_timestamping(const secp256k1_context* ctx, const unsigned char* dataHashPointer, const unsigned char* rPointer) {
+    secp256k1_scalar dataHashBytes, rBytes;
+    secp256k1_scalar_set_b32(&dataHashBytes, dataHashPointer, NULL);
+    secp256k1_scalar_set_b32(&rBytes, rPointer, NULL);
+    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
+    return secp256k1_ecdsa_verify_timestamped_r(&ctx->ecmult_gen_ctx, &dataHashBytes, &rBytes);
+}
+
 int secp256k1_ec_seckey_verify(const secp256k1_context* ctx, const unsigned char *seckey) {
     secp256k1_scalar sec;
     int ret;

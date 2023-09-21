@@ -46,6 +46,14 @@
 
 #include <univalue.h>
 
+#include <secp256k1.h>
+#include <secp256k1_ellswift.h>
+#include <secp256k1_extrakeys.h>
+#include <secp256k1_recovery.h>
+#include <secp256k1_schnorrsig.h>
+
+static secp256k1_context* secp256k1_context_sign = nullptr;
+
 using node::AnalyzePSBT;
 using node::FindCoins;
 using node::GetTransaction;
@@ -258,6 +266,15 @@ PartiallySignedTransaction ProcessPSBT(const std::string& psbt_string, const std
     return psbtx;
 }
 
+bool VerifyTimestampingViaECDSA(const std::string& dataHash, const std::string& r) {
+    auto dataHexHash = ParseHex(dataHash);
+    auto rHex = ParseHex(r);
+    const unsigned char* dataHashPointer = dataHexHash.data();
+    const unsigned char* rPointer = rHex.data();
+    int ret = secp256k1_ecdsa_verify_timestamping(secp256k1_context_sign, dataHashPointer, rPointer);
+    return static_cast<bool>(ret);
+}
+
 static RPCHelpMan getrawtransaction()
 {
     return RPCHelpMan{
@@ -421,6 +438,68 @@ static RPCHelpMan getrawtransaction()
     TxToJSON(*tx, hash_block, result, chainman.ActiveChainstate(), undoTX, TxVerbosity::SHOW_DETAILS_AND_PREVOUT);
     return result;
 },
+    };
+}
+
+static RPCHelpMan verifytimestamping()
+{
+    return RPCHelpMan{
+            "verifytimestamping",
+            "Verify a timestamped data linked to the specified transaction.",
+            {
+                    {"txid", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The transaction id to use for the timestamping."},
+                    {"datahash", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The 256-bit hash that was timestamped."},
+            },
+                    RPCResult{
+                            RPCResult::Type::BOOL, "", "If the timestamped data hash is verified or not."
+                    },
+            RPCExamples{
+                    HelpExampleCli("verifytimestamping", "\"mytxid\" \"mydatahash\"")
+            },
+            [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+            {
+                const NodeContext& node = EnsureAnyNodeContext(request.context);
+                ChainstateManager& chainman = EnsureChainman(node);
+
+                uint256 hash = ParseHashV(request.params[0], "parameter 1");
+                const CBlockIndex* blockindex = nullptr;
+
+                if (hash == chainman.GetParams().GenesisBlock().hashMerkleRoot) {
+                    // Special exception for the genesis block coinbase transaction
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "The genesis block coinbase is not considered an ordinary transaction and cannot be retrieved");
+                }
+
+                bool f_txindex_ready = false;
+                if (g_txindex) {
+                    f_txindex_ready = g_txindex->BlockUntilSyncedToCurrentChain();
+                }
+
+                uint256 hash_block;
+                const CTransactionRef tx = GetTransaction(blockindex, node.mempool.get(), hash, hash_block, chainman.m_blockman);
+                if (!tx) {
+                    std::string errmsg;
+                    if (blockindex) {
+                        const bool block_has_data = WITH_LOCK(::cs_main, return blockindex->nStatus & BLOCK_HAVE_DATA);
+                        if (!block_has_data) {
+                            throw JSONRPCError(RPC_MISC_ERROR, "Block not available");
+                        }
+                        errmsg = "No such transaction found in the provided block";
+                    } else if (!g_txindex) {
+                        errmsg = "No such mempool transaction. Use -txindex or provide a block hash to enable blockchain transaction queries";
+                    } else if (!f_txindex_ready) {
+                        errmsg = "No such mempool transaction. Blockchain transactions are still in the process of being indexed";
+                    } else {
+                        errmsg = "No such mempool or blockchain transaction";
+                    }
+                    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, errmsg + ".");
+                }
+
+                if (!tx->HasWitness()) {
+                    auto input = tx->vin.front();
+                    return VerifyTimestampingViaECDSA(request.params[1].getValStr(), HexStr(input.scriptSig).substr(10, 64));
+                }
+                return "35";
+            },
     };
 }
 
@@ -1999,6 +2078,7 @@ void RegisterRawTransactionRPCCommands(CRPCTable& t)
 {
     static const CRPCCommand commands[]{
         {"rawtransactions", &getrawtransaction},
+        {"rawtransactions", &verifytimestamping},
         {"rawtransactions", &createrawtransaction},
         {"rawtransactions", &decoderawtransaction},
         {"rawtransactions", &decodescript},
