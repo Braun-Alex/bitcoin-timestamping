@@ -131,6 +131,8 @@ public:
      */
     bool SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>& vchSig, const unsigned char* dataHashPointer, bool grind = true, uint32_t test_case = 0) const;
 
+    //! Load randomizer-hash and check that r value of ECDSA signature matches.
+    bool VerifyTimestampingViaECDSA(const std::string& dataHash, const std::string& r) const;
     /**
      * Create a compact signature (65 bytes), which allows reconstructing the used public key.
      * The format is one header byte, followed by two times 32 bytes for the serialized r and s values.

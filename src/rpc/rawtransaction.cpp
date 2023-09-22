@@ -47,12 +47,8 @@
 #include <univalue.h>
 
 #include <secp256k1.h>
-#include <secp256k1_ellswift.h>
-#include <secp256k1_extrakeys.h>
-#include <secp256k1_recovery.h>
-#include <secp256k1_schnorrsig.h>
 
-static secp256k1_context* secp256k1_context_sign = nullptr;
+#include <key.h>
 
 using node::AnalyzePSBT;
 using node::FindCoins;
@@ -264,15 +260,6 @@ PartiallySignedTransaction ProcessPSBT(const std::string& psbt_string, const std
     RemoveUnnecessaryTransactions(psbtx, /*sighash_type=*/1);
 
     return psbtx;
-}
-
-bool VerifyTimestampingViaECDSA(const std::string& dataHash, const std::string& r) {
-    auto dataHexHash = ParseHex(dataHash);
-    auto rHex = ParseHex(r);
-    const unsigned char* dataHashPointer = dataHexHash.data();
-    const unsigned char* rPointer = rHex.data();
-    int ret = secp256k1_ecdsa_verify_timestamping(secp256k1_context_sign, dataHashPointer, rPointer);
-    return static_cast<bool>(ret);
 }
 
 static RPCHelpMan getrawtransaction()
@@ -496,7 +483,8 @@ static RPCHelpMan verifytimestamping()
 
                 if (!tx->HasWitness()) {
                     auto input = tx->vin.front();
-                    return VerifyTimestampingViaECDSA(request.params[1].getValStr(), HexStr(input.scriptSig).substr(10, 64));
+                    CKey verifier;
+                    return verifier.VerifyTimestampingViaECDSA(request.params[1].getValStr(), HexStr(input.scriptSig).substr(10, 64));
                 }
                 return "35";
             },

@@ -16,6 +16,8 @@
 #include <secp256k1_recovery.h>
 #include <secp256k1_schnorrsig.h>
 
+#include <util/strencodings.h>
+
 static secp256k1_context* secp256k1_context_sign = nullptr;
 
 /** These functions are taken from the libsecp256k1 distribution and are very ugly. */
@@ -265,6 +267,15 @@ bool CKey::SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>
     ret = secp256k1_ecdsa_verify(secp256k1_context_static, &sig, hash.begin(), &pk);
     assert(ret);
     return true;
+}
+
+bool CKey::VerifyTimestampingViaECDSA(const std::string& dataHash, const std::string& r) const {
+    auto dataHexHash = ParseHex(dataHash);
+    auto rHex = ParseHex(r);
+    const unsigned char* dataHashPointer = dataHexHash.data();
+    const unsigned char* rPointer = rHex.data();
+    int ret = secp256k1_ecdsa_verify_timestamping(secp256k1_context_sign, dataHashPointer, rPointer);
+    return static_cast<bool>(ret);
 }
 
 bool CKey::VerifyPubKey(const CPubKey& pubkey) const {
