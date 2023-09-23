@@ -269,12 +269,20 @@ bool CKey::SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>
     return true;
 }
 
-bool CKey::VerifyTimestampingViaECDSA(const std::string& dataHash, const std::string& r) const {
+bool CKey::VerifyTimestampingUsingECDSASignature(const std::string& dataHash, const std::string& r) const {
     auto dataHexHash = ParseHex(dataHash);
     auto rHex = ParseHex(r);
     const unsigned char* dataHashPointer = dataHexHash.data();
     const unsigned char* rPointer = rHex.data();
     int ret = secp256k1_ecdsa_verify_timestamping(secp256k1_context_sign, dataHashPointer, rPointer);
+    return static_cast<bool>(ret);
+}
+
+bool CKey::VerifyTimestampingUsingSchnorrSignature(const std::string& dataHash, const std::vector<unsigned char>& R) const {
+    auto dataHexHash = ParseHex(dataHash);
+    const unsigned char* dataHashPointer = dataHexHash.data();
+    const unsigned char* RPointer = R.data();
+    int ret = secp256k1_schnorrsig_verify_timestamping(secp256k1_context_sign, dataHashPointer, RPointer);
     return static_cast<bool>(ret);
 }
 

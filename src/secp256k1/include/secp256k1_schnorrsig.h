@@ -133,6 +133,12 @@ SECP256K1_API int secp256k1_schnorrsig_sign32_using_timestamping(
         const unsigned char* dataHashPointer
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(5);
 
+SECP256K1_API int secp256k1_schnorrsig_verify_timestamping(
+        const secp256k1_context* ctx,
+        const unsigned char* dataHashPointer,
+        const unsigned char* RPointer
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
 /** Same as secp256k1_schnorrsig_sign32, but DEPRECATED. Will be removed in
  *  future versions. */
 SECP256K1_API int secp256k1_schnorrsig_sign(

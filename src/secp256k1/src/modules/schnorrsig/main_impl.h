@@ -270,6 +270,26 @@ int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, unsigned char *sig64
     return secp256k1_schnorrsig_sign32(ctx, sig64, msg32, keypair, aux_rand32);
 }
 
+int secp256k1_schnorrsig_verify_timestamping(const secp256k1_context* ctx, const unsigned char* dataHashPointer, const unsigned char* RPointer) {
+    secp256k1_scalar dataHashBytes, rBytes;
+    secp256k1_scalar_set_b32(&dataHashBytes, dataHashPointer, NULL);
+    secp256k1_scalar_set_b32(&rBytes, RPointer, NULL);
+    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
+    unsigned char bytes[32];
+    secp256k1_gej rp;
+    secp256k1_ge R;
+    secp256k1_scalar sigr;
+    int overflow = 0;
+
+    secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rp, &dataHashBytes);
+    secp256k1_ge_set_gej(&R, &rp);
+    secp256k1_fe_normalize(&R.x);
+    secp256k1_fe_normalize(&R.y);
+    secp256k1_fe_get_b32(bytes, &R.x);
+    secp256k1_scalar_set_b32(&sigr, bytes, &overflow);
+    return secp256k1_scalar_eq(&sigr, &rBytes);
+}
+
 int secp256k1_schnorrsig_sign_custom(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *msg, size_t msglen, const secp256k1_keypair *keypair, secp256k1_schnorrsig_extraparams *extraparams) {
     secp256k1_nonce_function_hardened noncefp = NULL;
     void *ndata = NULL;

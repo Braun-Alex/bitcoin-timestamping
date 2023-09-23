@@ -481,12 +481,50 @@ static RPCHelpMan verifytimestamping()
                     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, errmsg + ".");
                 }
 
-                if (!tx->HasWitness()) {
-                    auto input = tx->vin.front();
+                bool ret = false;
+
+                for (const auto& input: tx->vin) {
                     CKey verifier;
-                    return verifier.VerifyTimestampingViaECDSA(request.params[1].getValStr(), HexStr(input.scriptSig).substr(10, 64));
+                    if (input.scriptWitness.IsNull()) {
+                        auto firstByte = HexStr(input.scriptSig).substr(2);
+                        if (firstByte == "47") {
+                            ret = verifier.VerifyTimestampingUsingECDSASignature(
+                                    request.params[1].getValStr(),
+                                    HexStr(input.scriptSig).substr(10, 2*ParseHex(HexStr(input.scriptSig).substr(8, 2)).front()));
+                            if (ret) {
+                                return true;
+                            }
+                        }
+                        else if (firstByte == "30") {
+                            ret = verifier.VerifyTimestampingUsingECDSASignature(
+                                    request.params[1].getValStr(),
+                                    HexStr(input.scriptSig).substr(8, 2*ParseHex(HexStr(input.scriptSig).substr(6, 2)).front()));
+                            if (ret) {
+                                return true;
+                            }
+                        }
+                    } else {
+                        auto firstByte = input.scriptWitness.stack.front().begin()[0];
+                        if (firstByte == 48) {
+                            ret = verifier.VerifyTimestampingUsingECDSASignature(
+                                    request.params[1].getValStr(),
+                                    HexStr(std::vector<unsigned char>(input.scriptWitness.stack.front().begin() + 4,
+                                                                      input.scriptWitness.stack.front().begin() + 4 +
+                                                                      input.scriptWitness.stack.front().begin()[3])));
+                            if (ret) {
+                                return true;
+                            }
+                        } else {
+                            ret = verifier.VerifyTimestampingUsingSchnorrSignature(request.params[1].getValStr(),
+                                                                                   input.scriptWitness.stack.front());
+                            if (ret) {
+                                return true;
+                            }
+                        }
+                    }
                 }
-                return "35";
+
+                return false;
             },
     };
 }
