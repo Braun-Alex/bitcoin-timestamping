@@ -462,7 +462,7 @@ static RPCHelpMan verifytimestamping()
                 }
 
                 uint256 hash_block;
-                const CTransactionRef tx = GetTransaction(blockindex, node.mempool.get(), hash, hash_block, chainman.m_blockman);
+                const CTransactionRef tx = GetTransaction(blockindex, nullptr, hash, hash_block, chainman.m_blockman);
                 if (!tx) {
                     std::string errmsg;
                     if (blockindex) {
@@ -472,11 +472,11 @@ static RPCHelpMan verifytimestamping()
                         }
                         errmsg = "No such transaction found in the provided block";
                     } else if (!g_txindex) {
-                        errmsg = "No such mempool transaction. Use -txindex or provide a block hash to enable blockchain transaction queries";
+                        errmsg = "Use -txindex or provide a block hash to enable blockchain transaction queries";
                     } else if (!f_txindex_ready) {
-                        errmsg = "No such mempool transaction. Blockchain transactions are still in the process of being indexed";
+                        errmsg = "Blockchain transactions are still in the process of being indexed";
                     } else {
-                        errmsg = "No such mempool or blockchain transaction";
+                        errmsg = "No such blockchain transaction";
                     }
                     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, errmsg + ".");
                 }
