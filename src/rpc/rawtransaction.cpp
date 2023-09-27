@@ -486,7 +486,7 @@ static RPCHelpMan verifytimestamping()
                 for (const auto& input: tx->vin) {
                     CKey verifier;
                     if (input.scriptWitness.IsNull()) {
-                        auto firstByte = HexStr(input.scriptSig).substr(2);
+                        auto firstByte = HexStr(input.scriptSig).substr(0, 2);
                         if (firstByte == "47") {
                             ret = verifier.VerifyTimestampingUsingECDSASignature(
                                     request.params[1].getValStr(),
@@ -494,8 +494,7 @@ static RPCHelpMan verifytimestamping()
                             if (ret) {
                                 return true;
                             }
-                        }
-                        else if (firstByte == "30") {
+                        } else if (firstByte == "30") {
                             ret = verifier.VerifyTimestampingUsingECDSASignature(
                                     request.params[1].getValStr(),
                                     HexStr(input.scriptSig).substr(8, 2*ParseHex(HexStr(input.scriptSig).substr(6, 2)).front()));
