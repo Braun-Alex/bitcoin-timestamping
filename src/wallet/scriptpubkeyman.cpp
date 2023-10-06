@@ -611,9 +611,9 @@ bool LegacyScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const std::
     return ::SignTransaction(tx, this, coins, sighash, input_errors);
 }
 
-bool LegacyScriptPubKeyMan::SignTransactionUsingTimestamping(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, const unsigned char* dataHashPointer) const
+bool LegacyScriptPubKeyMan::SignTransactionUsingTimestamping(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) const
 {
-    return ::SignTransactionUsingTimestamping(tx, this, coins, sighash, input_errors, dataHashPointer);
+    return ::SignTransactionUsingTimestamping(tx, this, coins, sighash, input_errors, stealthFactorPointer, dataHashPointer);
 }
 
 SigningResult LegacyScriptPubKeyMan::SignMessage(const std::string& message, const PKHash& pkhash, std::string& str_sig) const
@@ -2452,7 +2452,7 @@ bool DescriptorScriptPubKeyMan::SignTransaction(CMutableTransaction& tx, const s
     return ::SignTransaction(tx, keys.get(), coins, sighash, input_errors);
 }
 
-bool DescriptorScriptPubKeyMan::SignTransactionUsingTimestamping(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, const unsigned char* dataHashPointer) const
+bool DescriptorScriptPubKeyMan::SignTransactionUsingTimestamping(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) const
 {
     std::unique_ptr<FlatSigningProvider> keys = std::make_unique<FlatSigningProvider>();
     for (const auto& coin_pair : coins) {
@@ -2463,7 +2463,7 @@ bool DescriptorScriptPubKeyMan::SignTransactionUsingTimestamping(CMutableTransac
         keys->Merge(std::move(*coin_keys));
     }
 
-    return ::SignTransactionUsingTimestamping(tx, keys.get(), coins, sighash, input_errors, dataHashPointer);
+    return ::SignTransactionUsingTimestamping(tx, keys.get(), coins, sighash, input_errors, stealthFactorPointer, dataHashPointer);
 }
 
 SigningResult DescriptorScriptPubKeyMan::SignMessage(const std::string& message, const PKHash& pkhash, std::string& str_sig) const

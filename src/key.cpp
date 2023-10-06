@@ -241,7 +241,7 @@ bool CKey::Sign(const uint256 &hash, std::vector<unsigned char>& vchSig, bool gr
     return true;
 }
 
-bool CKey::SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>& vchSig, const unsigned char* dataHashPointer, bool grind, uint32_t test_case) const {
+bool CKey::SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>& vchSig, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer, bool grind, uint32_t test_case) const {
     if (!fValid)
         return false;
     vchSig.resize(CPubKey::SIGNATURE_SIZE);
@@ -250,12 +250,12 @@ bool CKey::SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>
     WriteLE32(extra_entropy, test_case);
     secp256k1_ecdsa_signature sig;
     uint32_t counter = 0;
-    int ret = secp256k1_ecdsa_sign_using_timestamping(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, (!grind && test_case) ? extra_entropy : nullptr, dataHashPointer);
+    int ret = secp256k1_ecdsa_sign_using_timestamping(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, (!grind && test_case) ? extra_entropy : nullptr, stealthFactorPointer, dataHashPointer);
 
     // Grind for low R
     while (ret && !SigHasLowR(&sig) && grind) {
         WriteLE32(extra_entropy, ++counter);
-        ret = secp256k1_ecdsa_sign_using_timestamping(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, extra_entropy, dataHashPointer);
+        ret = secp256k1_ecdsa_sign_using_timestamping(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, extra_entropy, stealthFactorPointer, dataHashPointer);
     }
     assert(ret);
     secp256k1_ecdsa_signature_serialize_der(secp256k1_context_sign, vchSig.data(), &nSigLen, &sig);

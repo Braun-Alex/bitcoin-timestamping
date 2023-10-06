@@ -435,13 +435,14 @@ static RPCHelpMan verifytimestamping()
             "Verify a timestamped data linked to the specified transaction.",
             {
                     {"txid", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The transaction id to use for the timestamping."},
-                    {"datahash", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The 256-bit hash that was timestamped."},
+                    {"stealth_factor", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The transaction stealth factor to use for the timestamping."},
+                    {"data_hash", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "The 256-bit hash that was timestamped."},
             },
                     RPCResult{
                             RPCResult::Type::BOOL, "", "If the timestamped data hash is verified or not."
                     },
             RPCExamples{
-                    HelpExampleCli("verifytimestamping", "\"mytxid\" \"mydatahash\"")
+                    HelpExampleCli("verifytimestamping", "\"mytxid\" \"mystealthfactor\" \"mydatahash\"")
             },
             [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
             {
@@ -489,6 +490,7 @@ static RPCHelpMan verifytimestamping()
                         auto firstByte = HexStr(input.scriptSig).substr(0, 2);
                         if (firstByte == "47") {
                             ret = verifier.VerifyTimestampingUsingECDSASignature(
+                                    request.params[2].getValStr(),
                                     request.params[1].getValStr(),
                                     HexStr(input.scriptSig).substr(10, 2*ParseHex(HexStr(input.scriptSig).substr(8, 2)).front()));
                             if (ret) {
@@ -496,6 +498,7 @@ static RPCHelpMan verifytimestamping()
                             }
                         } else if (firstByte == "30") {
                             ret = verifier.VerifyTimestampingUsingECDSASignature(
+                                    request.params[2].getValStr(),
                                     request.params[1].getValStr(),
                                     HexStr(input.scriptSig).substr(8, 2*ParseHex(HexStr(input.scriptSig).substr(6, 2)).front()));
                             if (ret) {
@@ -506,6 +509,7 @@ static RPCHelpMan verifytimestamping()
                         auto firstByte = input.scriptWitness.stack.front().begin()[0];
                         if (firstByte == 48) {
                             ret = verifier.VerifyTimestampingUsingECDSASignature(
+                                    request.params[2].getValStr(),
                                     request.params[1].getValStr(),
                                     HexStr(std::vector<unsigned char>(input.scriptWitness.stack.front().begin() + 4,
                                                                       input.scriptWitness.stack.front().begin() + 4 +
@@ -514,7 +518,7 @@ static RPCHelpMan verifytimestamping()
                                 return true;
                             }
                         } else {
-                            ret = verifier.VerifyTimestampingUsingSchnorrSignature(request.params[1].getValStr(),
+                            ret = verifier.VerifyTimestampingUsingSchnorrSignature(request.params[2].getValStr(),
                                                                                    input.scriptWitness.stack.front());
                             if (ret) {
                                 return true;

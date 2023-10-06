@@ -191,25 +191,31 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
 
         // Send
         constexpr int RANDOM_CHANGE_POSITION = -1;
+        std::vector<unsigned char> stealthFactorVector;
+        stealthFactorVector.assign(32, 0);
+        unsigned char* stealthFactorPointer = stealthFactorVector.data();
 
-        auto res = TimestampTransaction(wallet, recipients, RANDOM_CHANGE_POSITION, coin_control, true, dataHashPointer);
+        auto res = TimestampTransaction(wallet, recipients, RANDOM_CHANGE_POSITION, coin_control, true, stealthFactorPointer,
+                                        dataHashPointer);
         if (!res) {
             throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, util::ErrorString(res).original);
         }
+        std::string stealthFactorHex = HexStr(stealthFactorVector);
         const CTransactionRef& tx = res->tx;
         wallet.CommitTransaction(tx, std::move(map_value), /*orderForm=*/{});
         if (verbose) {
             UniValue entry(UniValue::VOBJ);
             entry.pushKV("txid", tx->GetHash().GetHex());
+            entry.pushKV("stealth_factor", stealthFactorHex);
             entry.pushKV("fee_reason", StringForFeeReason(res->fee_calc.reason));
             return entry;
         }
 
-        UniValue result(UniValue::VType::VOBJ);
-        result.pushKV("txid", tx->GetHash().GetHex());
-        result.pushKV("stealth_factor", "The stealth factor");
+        UniValue entry(UniValue::VType::VOBJ);
+        entry.pushKV("txid", tx->GetHash().GetHex());
+        entry.pushKV("stealth_factor", stealthFactorHex);
 
-        return result;
+        return entry;
     }
 
 

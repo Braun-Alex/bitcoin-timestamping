@@ -2113,7 +2113,7 @@ bool CWallet::SignTransaction(CMutableTransaction& tx) const
     return SignTransaction(tx, coins, SIGHASH_DEFAULT, input_errors);
 }
 
-    bool CWallet::SignTransactionUsingTimestamping(CMutableTransaction& tx, const unsigned char* dataHashPointer) const
+    bool CWallet::SignTransactionUsingTimestamping(CMutableTransaction& tx, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) const
     {
         AssertLockHeld(cs_wallet);
 
@@ -2129,7 +2129,7 @@ bool CWallet::SignTransaction(CMutableTransaction& tx) const
             coins[input.prevout] = Coin(wtx.tx->vout[input.prevout.n], prev_height, wtx.IsCoinBase());
         }
         std::map<int, bilingual_str> input_errors;
-        return SignTransactionUsingTimestamping(tx, coins, SIGHASH_DEFAULT, input_errors, dataHashPointer);
+        return SignTransactionUsingTimestamping(tx, coins, SIGHASH_DEFAULT, input_errors, stealthFactorPointer, dataHashPointer);
     }
 
 bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors) const
@@ -2147,13 +2147,13 @@ bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint,
     return false;
 }
 
-    bool CWallet::SignTransactionUsingTimestamping(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, const unsigned char* dataHashPointer) const
+    bool CWallet::SignTransactionUsingTimestamping(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) const
     {
         // Try to sign with all ScriptPubKeyMans
         for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
             // spk_man->SignTransaction will return true if the transaction is complete,
             // so we can exit early and return true if that happens
-            if (spk_man->SignTransactionUsingTimestamping(tx, coins, sighash, input_errors, dataHashPointer)) {
+            if (spk_man->SignTransactionUsingTimestamping(tx, coins, sighash, input_errors, stealthFactorPointer, dataHashPointer)) {
                 return true;
             }
         }
