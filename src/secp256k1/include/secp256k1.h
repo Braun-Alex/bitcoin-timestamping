@@ -678,8 +678,9 @@ SECP256K1_API int secp256k1_ecdsa_sign_using_timestamping(
 SECP256K1_API int secp256k1_ecdsa_verify_timestamping(
         const secp256k1_context* ctx,
         const unsigned char* dataHashPointer,
+        const unsigned char* stealthFactorPointer,
         const unsigned char* rPointer
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
 /** Verify an ECDSA secret key.
  *

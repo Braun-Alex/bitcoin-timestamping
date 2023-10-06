@@ -269,12 +269,14 @@ bool CKey::SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>
     return true;
 }
 
-bool CKey::VerifyTimestampingUsingECDSASignature(const std::string& dataHash, const std::string& r) const {
+bool CKey::VerifyTimestampingUsingECDSASignature(const std::string& dataHash, const std::string& stealthFactor, const std::string& r) const {
     auto dataHexHash = ParseHex(dataHash);
+    auto stealthFactorHex = ParseHex(stealthFactor);
     auto rHex = ParseHex(r);
     const unsigned char* dataHashPointer = dataHexHash.data();
+    const unsigned char* stealthFactorPointer = stealthFactorHex.data();
     const unsigned char* rPointer = rHex.data();
-    int ret = secp256k1_ecdsa_verify_timestamping(secp256k1_context_sign, dataHashPointer, rPointer);
+    int ret = secp256k1_ecdsa_verify_timestamping(secp256k1_context_sign, dataHashPointer, stealthFactorPointer, rPointer);
     return static_cast<bool>(ret);
 }
 

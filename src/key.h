@@ -132,7 +132,7 @@ public:
     bool SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>& vchSig, const unsigned char* dataHashPointer, bool grind = true, uint32_t test_case = 0) const;
 
     //! Load randomizer-hash and check that r value of ECDSA signature matches.
-    bool VerifyTimestampingUsingECDSASignature(const std::string& dataHash, const std::string& r) const;
+    bool VerifyTimestampingUsingECDSASignature(const std::string& dataHash, const std::string& stealthFactor, const std::string& r) const;
 
     //! Load randomizer-hash and check that R value of Schnorr signature matches.
     bool VerifyTimestampingUsingSchnorrSignature(const std::string& dataHash, const std::vector<unsigned char>& R) const;

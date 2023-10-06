@@ -262,20 +262,46 @@ static int secp256k1_ecdsa_sig_verify(const secp256k1_scalar *sigr, const secp25
 #endif
 }
 
-static int secp256k1_ecdsa_verify_timestamped_r(const secp256k1_ecmult_gen_context* ctx, const secp256k1_scalar* k, const secp256k1_scalar* expectedR) {
+static int secp256k1_ecdsa_verify_timestamped_r(const secp256k1_ecmult_gen_context* ctx, const unsigned char* dataHashPointer, const unsigned char* stealthFactor,
+                                                const secp256k1_scalar* expectedR) {
+    secp256k1_sha256 sha;
+    secp256k1_sha256_write(&sha, stealthFactor, 32);
+    secp256k1_sha256_write(&sha, dataHashPointer, 32);
+    unsigned char hash[32];
+    secp256k1_sha256_finalize(&sha, hash);
+    secp256k1_scalar hashResult;
+    secp256k1_scalar_set_b32(&hashResult, hash, NULL);
+
     unsigned char bytes[32];
     secp256k1_gej rp;
-    secp256k1_ge r;
-    secp256k1_scalar sigr;
+    secp256k1_ge resultPoint;
+    secp256k1_scalar visibleResult, sigr, stealthFactorScalar;
     int overflow = 0;
 
-    secp256k1_ecmult_gen(ctx, &rp, k);
-    secp256k1_ge_set_gej(&r, &rp);
-    secp256k1_fe_normalize(&r.x);
-    secp256k1_fe_normalize(&r.y);
-    secp256k1_fe_get_b32(bytes, &r.x);
-    secp256k1_scalar_set_b32(&sigr, bytes, &overflow);
+    secp256k1_ecmult_gen(ctx, &rp, &hashResult);
+    secp256k1_ge_set_gej(&resultPoint, &rp);
+    secp256k1_fe_normalize(&resultPoint.x);
+    secp256k1_fe_normalize(&resultPoint.y);
+    secp256k1_fe_get_b32(bytes, &resultPoint.x);
+    secp256k1_scalar_set_b32(&visibleResult, bytes, &overflow);
+    secp256k1_scalar_set_b32(&stealthFactorScalar, stealthFactor, &overflow);
+    secp256k1_scalar_add(&sigr, &stealthFactorScalar, &visibleResult);
     return secp256k1_scalar_eq(&sigr, expectedR);
+}
+
+static int secp256k1_generate_secure_k(const unsigned char* j, const unsigned char* stealthFactor, const unsigned char* dataHashPointer, unsigned char* k) {
+    secp256k1_sha256 sha;
+    secp256k1_sha256_write(&sha, stealthFactor, 32);
+    secp256k1_sha256_write(&sha, dataHashPointer, 32);
+    unsigned char hash[32];
+    secp256k1_sha256_finalize(&sha, hash);
+    secp256k1_scalar secureK;
+    secp256k1_scalar_set_b32(&secureK, hash, NULL);
+    secp256k1_scalar jFactor;
+    secp256k1_scalar_set_b32(&jFactor, j, NULL);
+    secp256k1_scalar_add(&secureK, &secureK, &jFactor);
+    secp256k1_scalar_get_b32(k, &secureK);
+    return 1;
 }
 
 static int secp256k1_ecdsa_sig_sign(const secp256k1_ecmult_gen_context *ctx, secp256k1_scalar *sigr, secp256k1_scalar *sigs, const secp256k1_scalar *seckey, const secp256k1_scalar *message, const secp256k1_scalar *nonce, int *recid) {

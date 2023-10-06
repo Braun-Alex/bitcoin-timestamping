@@ -585,9 +585,25 @@ static int secp256k1_ecdsa_sign_inner_using_timestamping(const secp256k1_context
         /* The nonce is still secret here, but it being invalid is is less likely than 1:2^255. */
         secp256k1_declassify(ctx, &is_nonce_valid, sizeof(is_nonce_valid));
         if (is_nonce_valid) {
-            secp256k1_scalar dataHashBytes;
-            secp256k1_scalar_set_b32(&dataHashBytes, dataHashPointer, NULL);
-            ret = secp256k1_ecdsa_sig_sign(&ctx->ecmult_gen_ctx, r, s, &sec, &msg, &dataHashBytes, recid);
+            size_t byteSize = 32, stealthSize = 33;
+            secp256k1_pubkey stealthFactor;
+            unsigned char* j = malloc(byteSize);
+            secp256k1_scalar_get_b32(j, &non);
+            ret = secp256k1_ec_pubkey_create(ctx, &stealthFactor, j);
+            if (!ret) {
+                break;
+            }
+            unsigned char* stealthFactorPointer = malloc(stealthSize);
+            unsigned char* k = malloc(byteSize);
+            secp256k1_ec_pubkey_serialize(ctx, stealthFactorPointer, &stealthSize, &stealthFactor, SECP256K1_EC_COMPRESSED);
+            ret = secp256k1_generate_secure_k(j, stealthFactorPointer, dataHashPointer, k);
+
+            secp256k1_scalar kBytes;
+            secp256k1_scalar_set_b32(&kBytes, k, NULL);
+            ret = secp256k1_ecdsa_sig_sign(&ctx->ecmult_gen_ctx, r, s, &sec, &msg, &kBytes, recid);
+            free(j);
+            free(stealthFactorPointer);
+            free(k);
             /* The final signature is no longer a secret, nor is the fact that we were successful or not. */
             secp256k1_declassify(ctx, &ret, sizeof(ret));
             if (ret) {
@@ -641,12 +657,12 @@ int secp256k1_ecdsa_sign_using_timestamping(const secp256k1_context* ctx, secp25
     return ret;
 }
 
-int secp256k1_ecdsa_verify_timestamping(const secp256k1_context* ctx, const unsigned char* dataHashPointer, const unsigned char* rPointer) {
-    secp256k1_scalar dataHashBytes, rBytes;
-    secp256k1_scalar_set_b32(&dataHashBytes, dataHashPointer, NULL);
+int secp256k1_ecdsa_verify_timestamping(const secp256k1_context* ctx, const unsigned char* dataHashPointer, const unsigned char* stealthFactorPointer,
+                                        const unsigned char* rPointer) {
+    secp256k1_scalar rBytes;
     secp256k1_scalar_set_b32(&rBytes, rPointer, NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
-    return secp256k1_ecdsa_verify_timestamped_r(&ctx->ecmult_gen_ctx, &dataHashBytes, &rBytes);
+    return secp256k1_ecdsa_verify_timestamped_r(&ctx->ecmult_gen_ctx, dataHashPointer, stealthFactorPointer, &rBytes);
 }
 
 int secp256k1_ec_seckey_verify(const secp256k1_context* ctx, const unsigned char *seckey) {

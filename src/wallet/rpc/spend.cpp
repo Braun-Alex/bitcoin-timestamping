@@ -21,13 +21,11 @@
 #include <wallet/wallet.h>
 #include <util/message.h>
 #include <crypto/sha3.h>
-
-#include <filesystem>
-#include <fstream>
-#include <random>
+#include <secp256k1.h>
 
 #include <univalue.h>
 
+static secp256k1_context* secp256k1_context_sign = nullptr;
 
 namespace wallet {
 static void ParseRecipients(const UniValue& address_amounts, const UniValue& subtract_fee_outputs, std::vector<CRecipient>& recipients)
@@ -193,6 +191,7 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
 
         // Send
         constexpr int RANDOM_CHANGE_POSITION = -1;
+
         auto res = TimestampTransaction(wallet, recipients, RANDOM_CHANGE_POSITION, coin_control, true, dataHashPointer);
         if (!res) {
             throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, util::ErrorString(res).original);
@@ -205,7 +204,12 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
             entry.pushKV("fee_reason", StringForFeeReason(res->fee_calc.reason));
             return entry;
         }
-        return tx->GetHash().GetHex();
+
+        UniValue result(UniValue::VType::VOBJ);
+        result.pushKV("txid", tx->GetHash().GetHex());
+        result.pushKV("stealth_factor", "The stealth factor");
+
+        return result;
     }
 
 
@@ -273,12 +277,17 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
                           },
                           {
                                   RPCResult{"if verbose is not set or set to false",
-                                            RPCResult::Type::STR_HEX, "txid", "The transaction id."
+                                            RPCResult::Type::OBJ, "", "",
+                                            {
+                                                    {RPCResult::Type::STR_HEX, "txid", "The transaction id."},
+                                                    {RPCResult::Type::STR_HEX, "stealth_factor", "The stealth factor"}
+                                            }
                                   },
                                   RPCResult{"if verbose is set to true",
                                             RPCResult::Type::OBJ, "", "",
                                             {
                                                     {RPCResult::Type::STR_HEX, "txid", "The transaction id."},
+                                                    {RPCResult::Type::STR_HEX, "stealth_factor", "The stealth factor"},
                                                     {RPCResult::Type::STR, "fee_reason", "The transaction fee reason."}
                                             },
                                   },
