@@ -269,6 +269,11 @@ bool CKey::SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>
     return true;
 }
 
+void CKey::GenerateStealthResult(const std::vector<unsigned char>& stealthFactor, unsigned char* stealthResult) {
+    const unsigned char* stealthFactorPointer = stealthFactor.data();
+    secp256k1_generate_stealth_result(secp256k1_context_sign, stealthFactorPointer, stealthResult);
+}
+
 bool CKey::VerifyTimestampingUsingECDSASignature(const std::string& dataHash, const std::string& stealthFactor, const std::string& r) const {
     auto dataHexHash = ParseHex(dataHash);
     auto stealthFactorHex = ParseHex(stealthFactor);

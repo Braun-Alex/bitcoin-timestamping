@@ -262,6 +262,20 @@ static int secp256k1_ecdsa_sig_verify(const secp256k1_scalar *sigr, const secp25
 #endif
 }
 
+static int secp256k1_generate_stealth_J(const secp256k1_ecmult_gen_context* ctx, const unsigned char* stealthFactor, unsigned char* stealthResult) {
+    secp256k1_gej rp;
+    secp256k1_ge stealthPoint;
+    secp256k1_scalar stealthResultScalar;
+    int overflow = 0;
+    secp256k1_scalar_set_b32(&stealthResultScalar, stealthFactor, &overflow);
+    secp256k1_ecmult_gen(ctx, &rp, &stealthResultScalar);
+    secp256k1_ge_set_gej(&stealthPoint, &rp);
+    secp256k1_fe_normalize(&stealthPoint.x);
+    secp256k1_fe_normalize(&stealthPoint.y);
+    secp256k1_fe_get_b32(stealthResult, &stealthPoint.x);
+    return 1;
+}
+
 static int secp256k1_ecdsa_verify_timestamped_r(const secp256k1_ecmult_gen_context* ctx, const unsigned char* dataHashPointer, const unsigned char* stealthFactor,
                                                 const secp256k1_scalar* expectedR) {
     secp256k1_sha256 sha;

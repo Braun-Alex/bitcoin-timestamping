@@ -683,6 +683,12 @@ SECP256K1_API int secp256k1_ecdsa_verify_timestamping(
         const unsigned char* rPointer
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
 
+SECP256K1_API int secp256k1_generate_stealth_result(
+        const secp256k1_context* ctx,
+        const unsigned char* stealthFactor,
+        unsigned char* stealthResult
+) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
+
 /** Verify an ECDSA secret key.
  *
  *  A secret key is valid if it is not 0 and less than the secp256k1 curve order

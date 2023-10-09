@@ -200,7 +200,14 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
         if (!res) {
             throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, util::ErrorString(res).original);
         }
-        std::string stealthFactorHex = HexStr(stealthFactorVector);
+
+        std::vector<unsigned char> stealthResultVector;
+        stealthResultVector.assign(32, 0);
+        unsigned char* stealthResult = stealthResultVector.data();
+        CKey generator;
+        generator.GenerateStealthResult(stealthFactorVector, stealthResult);
+
+        std::string stealthFactorHex = HexStr(stealthResultVector);
         const CTransactionRef& tx = res->tx;
         wallet.CommitTransaction(tx, std::move(map_value), /*orderForm=*/{});
         if (verbose) {

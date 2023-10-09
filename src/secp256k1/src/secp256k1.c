@@ -586,13 +586,21 @@ static int secp256k1_ecdsa_sign_inner_using_timestamping(const secp256k1_context
         secp256k1_declassify(ctx, &is_nonce_valid, sizeof(is_nonce_valid));
         if (is_nonce_valid) {
             size_t byteSize = 32;
-            unsigned char* j = malloc(byteSize);
-            secp256k1_scalar_get_b32(j, &non);
+            unsigned char* J = malloc(byteSize);
+            int i;
+            for (i = 0; i < 32; i++) {
+                if (*(stealthFactorPointer + i) != 0) {
+                    break;
+                }
+                if (i == 31) {
+                    secp256k1_scalar_get_b32(stealthFactorPointer, &non);
+                }
+            }
             if (!ret) {
                 break;
             }
             unsigned char* k = malloc(byteSize);
-            secp256k1_generate_secure_k(&ctx->ecmult_gen_ctx, j, stealthFactorPointer, dataHashPointer, k);
+            secp256k1_generate_secure_k(&ctx->ecmult_gen_ctx, stealthFactorPointer, J, dataHashPointer, k);
 
             secp256k1_scalar kBytes;
             secp256k1_scalar_set_b32(&kBytes, k, NULL);
@@ -602,7 +610,7 @@ static int secp256k1_ecdsa_sign_inner_using_timestamping(const secp256k1_context
             if (ret) {
                 break;
             }
-            free(j);
+            free(J);
             free(k);
         }
         count++;
@@ -650,6 +658,12 @@ int secp256k1_ecdsa_sign_using_timestamping(const secp256k1_context* ctx, secp25
     ret = secp256k1_ecdsa_sign_inner_using_timestamping(ctx, &r, &s, NULL, msghash32, seckey, noncefp, noncedata, stealthFactorPointer, dataHashPointer);
     secp256k1_ecdsa_signature_save(signature, &r, &s);
     return ret;
+}
+
+int secp256k1_generate_stealth_result(const secp256k1_context* ctx, const unsigned char* stealthFactor, unsigned char* stealthResult) {
+    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
+    secp256k1_generate_stealth_J(&ctx->ecmult_gen_ctx, stealthFactor, stealthResult);
+    return 1;
 }
 
 int secp256k1_ecdsa_verify_timestamping(const secp256k1_context* ctx, const unsigned char* dataHashPointer, const unsigned char* stealthFactorPointer,
