@@ -555,7 +555,7 @@ static int secp256k1_ecdsa_sign_inner(const secp256k1_context* ctx, secp256k1_sc
     return ret;
 }
 
-static int secp256k1_ecdsa_sign_inner_using_timestamping(const secp256k1_context* ctx, secp256k1_scalar* r, secp256k1_scalar* s, int* recid, const unsigned char *msg32, const unsigned char *seckey, secp256k1_nonce_function noncefp, const void* noncedata, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) {
+static int secp256k1_ecdsa_sign_inner_using_timestamping(const secp256k1_context* ctx, secp256k1_scalar* r, secp256k1_scalar* s, int* recid, const unsigned char *msg32, const unsigned char *seckey, secp256k1_nonce_function noncefp, const void* noncedata, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer, int* sign) {
     secp256k1_scalar sec, non, msg;
     int ret = 0;
     int is_sec_valid;
@@ -587,17 +587,8 @@ static int secp256k1_ecdsa_sign_inner_using_timestamping(const secp256k1_context
         if (is_nonce_valid) {
             size_t byteSize = 32;
             unsigned char* J = malloc(byteSize);
-            int i;
-            for (i = 0; i < 32; i++) {
-                if (*(stealthFactorPointer + i) != 0) {
-                    break;
-                }
-                if (i == 31) {
-                    secp256k1_scalar_get_b32(stealthFactorPointer, &non);
-                }
-            }
-            if (!ret) {
-                break;
+            if (*sign) {
+                secp256k1_scalar_get_b32(stealthFactorPointer, &non);
             }
             unsigned char* k = malloc(byteSize);
             secp256k1_generate_secure_k(&ctx->ecmult_gen_ctx, stealthFactorPointer, J, dataHashPointer, k);
@@ -646,7 +637,7 @@ int secp256k1_ecdsa_sign(const secp256k1_context* ctx, secp256k1_ecdsa_signature
     return ret;
 }
 
-int secp256k1_ecdsa_sign_using_timestamping(const secp256k1_context* ctx, secp256k1_ecdsa_signature *signature, const unsigned char *msghash32, const unsigned char *seckey, secp256k1_nonce_function noncefp, const void* noncedata, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) {
+int secp256k1_ecdsa_sign_using_timestamping(const secp256k1_context* ctx, secp256k1_ecdsa_signature *signature, const unsigned char *msghash32, const unsigned char *seckey, secp256k1_nonce_function noncefp, const void* noncedata, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer, int* sign) {
     secp256k1_scalar r, s;
     int ret;
     VERIFY_CHECK(ctx != NULL);
@@ -655,15 +646,9 @@ int secp256k1_ecdsa_sign_using_timestamping(const secp256k1_context* ctx, secp25
     ARG_CHECK(signature != NULL);
     ARG_CHECK(seckey != NULL);
 
-    ret = secp256k1_ecdsa_sign_inner_using_timestamping(ctx, &r, &s, NULL, msghash32, seckey, noncefp, noncedata, stealthFactorPointer, dataHashPointer);
+    ret = secp256k1_ecdsa_sign_inner_using_timestamping(ctx, &r, &s, NULL, msghash32, seckey, noncefp, noncedata, stealthFactorPointer, dataHashPointer, sign);
     secp256k1_ecdsa_signature_save(signature, &r, &s);
     return ret;
-}
-
-int secp256k1_generate_stealth_result(const secp256k1_context* ctx, const unsigned char* stealthFactor, unsigned char* stealthResult) {
-    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
-    secp256k1_generate_stealth_J(&ctx->ecmult_gen_ctx, stealthFactor, stealthResult);
-    return 1;
 }
 
 int secp256k1_ecdsa_verify_timestamping(const secp256k1_context* ctx, const unsigned char* dataHashPointer, const unsigned char* stealthFactorPointer,

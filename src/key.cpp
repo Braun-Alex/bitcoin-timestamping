@@ -250,12 +250,15 @@ bool CKey::SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>
     WriteLE32(extra_entropy, test_case);
     secp256k1_ecdsa_signature sig;
     uint32_t counter = 0;
-    int ret = secp256k1_ecdsa_sign_using_timestamping(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, (!grind && test_case) ? extra_entropy : nullptr, stealthFactorPointer, dataHashPointer);
+    int* sign = new int(1);
+    int ret = secp256k1_ecdsa_sign_using_timestamping(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, (!grind && test_case) ? extra_entropy : nullptr, stealthFactorPointer, dataHashPointer, sign);
+    *sign = 0;
 
     // Grind for low R
     while (ret && !SigHasLowR(&sig) && grind) {
+        *sign = 1;
         WriteLE32(extra_entropy, ++counter);
-        ret = secp256k1_ecdsa_sign_using_timestamping(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, extra_entropy, stealthFactorPointer, dataHashPointer);
+        ret = secp256k1_ecdsa_sign_using_timestamping(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, extra_entropy, stealthFactorPointer, dataHashPointer, sign);
     }
     assert(ret);
     secp256k1_ecdsa_signature_serialize_der(secp256k1_context_sign, vchSig.data(), &nSigLen, &sig);
@@ -266,12 +269,19 @@ bool CKey::SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>
     assert(ret);
     ret = secp256k1_ecdsa_verify(secp256k1_context_static, &sig, hash.begin(), &pk);
     assert(ret);
+    delete sign;
     return true;
 }
 
-void CKey::GenerateStealthResult(const std::vector<unsigned char>& stealthFactor, unsigned char* stealthResult) {
-    const unsigned char* stealthFactorPointer = stealthFactor.data();
-    secp256k1_generate_stealth_result(secp256k1_context_sign, stealthFactorPointer, stealthResult);
+void CKey::GenerateStealthResult(std::vector<unsigned char>& stealthFactor, const unsigned char* stealthResult) {
+    unsigned char* stealthFactorPointer = stealthFactor.data();
+    secp256k1_pubkey pk;
+    if (!secp256k1_ec_pubkey_create(secp256k1_context_sign, &pk, stealthResult)) {
+        return;
+    }
+    size_t* size = new size_t(65);
+    secp256k1_ec_pubkey_serialize(secp256k1_context_sign, stealthFactorPointer, size, &pk, SECP256K1_EC_UNCOMPRESSED);
+    delete size;
 }
 
 bool CKey::VerifyTimestampingUsingECDSASignature(const std::string& dataHash, const std::string& stealthFactor, const std::string& r) const {

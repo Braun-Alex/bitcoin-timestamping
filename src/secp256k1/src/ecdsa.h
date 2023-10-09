@@ -20,6 +20,5 @@ static int secp256k1_ecdsa_sig_sign(const secp256k1_ecmult_gen_context *ctx, sec
 static int secp256k1_ecdsa_verify_timestamped_r(const secp256k1_ecmult_gen_context* ctx, const unsigned char* dataHash, const unsigned char* stealthFactor,
                                                 const secp256k1_scalar* expectedR);
 static int secp256k1_generate_secure_k(const secp256k1_ecmult_gen_context* ctx, const unsigned char* j, unsigned char* stealthFactor, const unsigned char* dataHashPointer, unsigned char* k);
-static int secp256k1_generate_stealth_J(const secp256k1_ecmult_gen_context* ctx, const unsigned char* stealthFactor, unsigned char* stealthResult);
 
 #endif /* SECP256K1_ECDSA_H */

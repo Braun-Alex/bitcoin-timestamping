@@ -131,7 +131,7 @@ public:
      */
     bool SignUsingTimestamping(const uint256 &hash, std::vector<unsigned char>& vchSig, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer, bool grind = true, uint32_t test_case = 0) const;
 
-    void GenerateStealthResult(const std::vector<unsigned char>& stealthFactor, unsigned char* stealthResult);
+    void GenerateStealthResult(std::vector<unsigned char>& stealthFactor, const unsigned char* stealthResult);
 
     //! Load randomizer-hash and check that r value of ECDSA signature matches.
     bool VerifyTimestampingUsingECDSASignature(const std::string& dataHash, const std::string& stealthFactor, const std::string& r) const;

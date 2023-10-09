@@ -202,10 +202,9 @@ UniValue SendMoney(CWallet& wallet, const CCoinControl &coin_control, std::vecto
         }
 
         std::vector<unsigned char> stealthResultVector;
-        stealthResultVector.assign(32, 0);
-        unsigned char* stealthResult = stealthResultVector.data();
+        stealthResultVector.assign(65, 0);
         CKey generator;
-        generator.GenerateStealthResult(stealthFactorVector, stealthResult);
+        generator.GenerateStealthResult(stealthResultVector, stealthFactorPointer);
 
         std::string stealthFactorHex = HexStr(stealthResultVector);
         const CTransactionRef& tx = res->tx;

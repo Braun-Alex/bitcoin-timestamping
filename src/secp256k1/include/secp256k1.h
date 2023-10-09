@@ -673,7 +673,8 @@ SECP256K1_API int secp256k1_ecdsa_sign_using_timestamping(
         secp256k1_nonce_function noncefp,
         const void* noncedata,
         unsigned char* stealthFactorPointer,
-        const unsigned char* dataHashPointer
+        const unsigned char* dataHashPointer,
+        int* sign
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4) SECP256K1_ARG_NONNULL(7) SECP256K1_ARG_NONNULL(8);
 
 SECP256K1_API int secp256k1_ecdsa_verify_timestamping(
@@ -682,12 +683,6 @@ SECP256K1_API int secp256k1_ecdsa_verify_timestamping(
         const unsigned char* stealthFactorPointer,
         const unsigned char* rPointer
 ) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3) SECP256K1_ARG_NONNULL(4);
-
-SECP256K1_API int secp256k1_generate_stealth_result(
-        const secp256k1_context* ctx,
-        const unsigned char* stealthFactor,
-        unsigned char* stealthResult
-) SECP256K1_ARG_NONNULL(1) SECP256K1_ARG_NONNULL(2) SECP256K1_ARG_NONNULL(3);
 
 /** Verify an ECDSA secret key.
  *
