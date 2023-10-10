@@ -196,6 +196,7 @@ static int secp256k1_schnorrsig_sign_internal_using_timestamping(const secp256k1
     secp256k1_scalar sk;
     secp256k1_scalar e;
     secp256k1_scalar k;
+    secp256k1_scalar stealthFactor;
     secp256k1_gej rj;
     secp256k1_ge pk;
     secp256k1_ge r;
@@ -225,9 +226,10 @@ static int secp256k1_schnorrsig_sign_internal_using_timestamping(const secp256k1
     secp256k1_scalar_get_b32(seckey, &sk);
     secp256k1_fe_get_b32(pk_buf, &pk.x);
     ret &= !!noncefp(buf, msg, msglen, seckey, pk_buf, bip340_algo, sizeof(bip340_algo), ndata);
-    secp256k1_scalar_set_b32(&k, buf, NULL);
-    ret &= !secp256k1_scalar_is_zero(&k);
-    secp256k1_scalar_cmov(&k, &secp256k1_scalar_one, !ret);
+    secp256k1_scalar_set_b32(&stealthFactor, buf, NULL);
+    ret &= !secp256k1_scalar_is_zero(&stealthFactor);
+    secp256k1_scalar_cmov(&stealthFactor, &secp256k1_scalar_one, !ret);
+    secp256k1_scalar_get_b32(stealthFactorPointer, &stealthFactor);
 
     const size_t byteSize = 32;
     unsigned char* J = malloc(byteSize);
