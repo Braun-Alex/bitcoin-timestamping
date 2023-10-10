@@ -25,8 +25,6 @@
 
 #include <univalue.h>
 
-static secp256k1_context* secp256k1_context_sign = nullptr;
-
 namespace wallet {
 static void ParseRecipients(const UniValue& address_amounts, const UniValue& subtract_fee_outputs, std::vector<CRecipient>& recipients)
 {

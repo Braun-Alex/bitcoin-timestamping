@@ -226,9 +226,12 @@ static int secp256k1_schnorrsig_sign_internal_using_timestamping(const secp256k1
     secp256k1_scalar_get_b32(seckey, &sk);
     secp256k1_fe_get_b32(pk_buf, &pk.x);
     ret &= !!noncefp(buf, msg, msglen, seckey, pk_buf, bip340_algo, sizeof(bip340_algo), ndata);
-    secp256k1_scalar_set_b32(&stealthFactor, buf, NULL);
-    ret &= !secp256k1_scalar_is_zero(&stealthFactor);
-    secp256k1_scalar_cmov(&stealthFactor, &secp256k1_scalar_one, !ret);
+
+    int is_nonce_valid = secp256k1_scalar_set_b32_seckey(&stealthFactor, buf);
+    while (!is_nonce_valid) {
+        ret &= !!noncefp(buf, msg, msglen, seckey, pk_buf, bip340_algo, sizeof(bip340_algo), ndata);
+        is_nonce_valid = secp256k1_scalar_set_b32_seckey(&stealthFactor, buf);
+    }
     secp256k1_scalar_get_b32(stealthFactorPointer, &stealthFactor);
 
     const size_t byteSize = 32;
