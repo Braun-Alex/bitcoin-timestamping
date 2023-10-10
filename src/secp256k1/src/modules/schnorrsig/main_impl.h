@@ -192,7 +192,7 @@ static int secp256k1_schnorrsig_sign_internal(const secp256k1_context* ctx, unsi
     return ret;
 }
 
-static int secp256k1_schnorrsig_sign_internal_using_timestamping(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *msg, size_t msglen, const secp256k1_keypair *keypair, secp256k1_nonce_function_hardened noncefp, void *ndata, const unsigned char* dataHashPointer) {
+static int secp256k1_schnorrsig_sign_internal_using_timestamping(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *msg, size_t msglen, const secp256k1_keypair *keypair, secp256k1_nonce_function_hardened noncefp, void *ndata, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) {
     secp256k1_scalar sk;
     secp256k1_scalar e;
     secp256k1_scalar k;
@@ -228,7 +228,12 @@ static int secp256k1_schnorrsig_sign_internal_using_timestamping(const secp256k1
     secp256k1_scalar_set_b32(&k, buf, NULL);
     ret &= !secp256k1_scalar_is_zero(&k);
     secp256k1_scalar_cmov(&k, &secp256k1_scalar_one, !ret);
-    secp256k1_scalar_set_b32(&k, dataHashPointer, NULL);
+
+    const size_t byteSize = 32;
+    unsigned char* J = malloc(byteSize);
+    unsigned char* kBytes = malloc(byteSize);
+    secp256k1_generate_secure_k(&ctx->ecmult_gen_ctx, stealthFactorPointer, J, dataHashPointer, kBytes);
+    secp256k1_scalar_set_b32(&k, kBytes, NULL);
 
     secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &k);
     secp256k1_ge_set_gej(&r, &rj);
@@ -248,6 +253,9 @@ static int secp256k1_schnorrsig_sign_internal_using_timestamping(const secp256k1
     secp256k1_scalar_add(&e, &e, &k);
     secp256k1_scalar_get_b32(&sig64[32], &e);
 
+    free(J);
+    free(kBytes);
+
     secp256k1_memczero(sig64, 64, !ret);
     secp256k1_scalar_clear(&k);
     secp256k1_scalar_clear(&sk);
@@ -261,33 +269,13 @@ int secp256k1_schnorrsig_sign32(const secp256k1_context* ctx, unsigned char *sig
     return secp256k1_schnorrsig_sign_internal(ctx, sig64, msg32, 32, keypair, secp256k1_nonce_function_bip340, (unsigned char*)aux_rand32);
 }
 
-int secp256k1_schnorrsig_sign32_using_timestamping(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *msg32, const secp256k1_keypair *keypair, const unsigned char *aux_rand32, const unsigned char* dataHashPointer) {
+int secp256k1_schnorrsig_sign32_using_timestamping(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *msg32, const secp256k1_keypair *keypair, const unsigned char *aux_rand32, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) {
     /* We cast away const from the passed aux_rand32 argument since we know the default nonce function does not modify it. */
-    return secp256k1_schnorrsig_sign_internal_using_timestamping(ctx, sig64, msg32, 32, keypair, secp256k1_nonce_function_bip340, (unsigned char*)aux_rand32, dataHashPointer);
+    return secp256k1_schnorrsig_sign_internal_using_timestamping(ctx, sig64, msg32, 32, keypair, secp256k1_nonce_function_bip340, (unsigned char*)aux_rand32, stealthFactorPointer, dataHashPointer);
 }
 
 int secp256k1_schnorrsig_sign(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *msg32, const secp256k1_keypair *keypair, const unsigned char *aux_rand32) {
     return secp256k1_schnorrsig_sign32(ctx, sig64, msg32, keypair, aux_rand32);
-}
-
-int secp256k1_schnorrsig_verify_timestamping(const secp256k1_context* ctx, const unsigned char* dataHashPointer, const unsigned char* RPointer) {
-    secp256k1_scalar dataHashBytes, rBytes;
-    secp256k1_scalar_set_b32(&dataHashBytes, dataHashPointer, NULL);
-    secp256k1_scalar_set_b32(&rBytes, RPointer, NULL);
-    ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
-    unsigned char bytes[32];
-    secp256k1_gej rp;
-    secp256k1_ge R;
-    secp256k1_scalar sigr;
-    int overflow = 0;
-
-    secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rp, &dataHashBytes);
-    secp256k1_ge_set_gej(&R, &rp);
-    secp256k1_fe_normalize(&R.x);
-    secp256k1_fe_normalize(&R.y);
-    secp256k1_fe_get_b32(bytes, &R.x);
-    secp256k1_scalar_set_b32(&sigr, bytes, &overflow);
-    return secp256k1_scalar_eq(&sigr, &rBytes);
 }
 
 int secp256k1_schnorrsig_sign_custom(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *msg, size_t msglen, const secp256k1_keypair *keypair, secp256k1_schnorrsig_extraparams *extraparams) {

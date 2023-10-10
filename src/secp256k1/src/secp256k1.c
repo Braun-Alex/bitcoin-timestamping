@@ -585,7 +585,7 @@ static int secp256k1_ecdsa_sign_inner_using_timestamping(const secp256k1_context
         /* The nonce is still secret here, but it being invalid is is less likely than 1:2^255. */
         secp256k1_declassify(ctx, &is_nonce_valid, sizeof(is_nonce_valid));
         if (is_nonce_valid) {
-            size_t byteSize = 32;
+            const size_t byteSize = 32;
             unsigned char* J = malloc(byteSize);
             if (*sign) {
                 secp256k1_scalar_get_b32(stealthFactorPointer, &non);

@@ -115,7 +115,7 @@ bool MutableTransactionSignatureCreator::CreateSchnorrSig(const SigningProvider&
     return true;
 }
 
-bool MutableTransactionSignatureCreator::CreateSchnorrSigUsingTimestamping(const SigningProvider& provider, std::vector<unsigned char>& sig, const XOnlyPubKey& pubkey, const uint256* leaf_hash, const uint256* merkle_root, SigVersion sigversion, const unsigned char* dataHashPointer) const
+bool MutableTransactionSignatureCreator::CreateSchnorrSigUsingTimestamping(const SigningProvider& provider, std::vector<unsigned char>& sig, const XOnlyPubKey& pubkey, const uint256* leaf_hash, const uint256* merkle_root, SigVersion sigversion, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) const
 {
     assert(sigversion == SigVersion::TAPROOT || sigversion == SigVersion::TAPSCRIPT);
 
@@ -141,7 +141,7 @@ bool MutableTransactionSignatureCreator::CreateSchnorrSigUsingTimestamping(const
     if (!SignatureHashSchnorr(hash, execdata, m_txto, nIn, nHashType, sigversion, *m_txdata, MissingDataBehavior::FAIL)) return false;
     sig.resize(64);
     // Use uint256{} as aux_rnd for now.
-    if (!key.SignSchnorrUsingTimestamping(hash, sig, merkle_root, {}, dataHashPointer)) return false;
+    if (!key.SignSchnorrUsingTimestamping(hash, sig, merkle_root, {}, stealthFactorPointer, dataHashPointer)) return false;
     if (nHashType) sig.push_back(nHashType);
     return true;
 }
@@ -249,7 +249,7 @@ static bool CreateTaprootScriptSig(const BaseSignatureCreator& creator, Signatur
     return false;
 }
 
-static bool CreateTaprootScriptSigUsingTimestamping(const BaseSignatureCreator& creator, SignatureData& sigdata, const SigningProvider& provider, std::vector<unsigned char>& sig_out, const XOnlyPubKey& pubkey, const uint256& leaf_hash, SigVersion sigversion, const unsigned char* dataHashPointer)
+static bool CreateTaprootScriptSigUsingTimestamping(const BaseSignatureCreator& creator, SignatureData& sigdata, const SigningProvider& provider, std::vector<unsigned char>& sig_out, const XOnlyPubKey& pubkey, const uint256& leaf_hash, SigVersion sigversion, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer)
 {
     KeyOriginInfo info;
     if (provider.GetKeyOriginByXOnly(pubkey, info)) {
@@ -267,7 +267,7 @@ static bool CreateTaprootScriptSigUsingTimestamping(const BaseSignatureCreator& 
         sig_out = it->second;
         return true;
     }
-    if (creator.CreateSchnorrSigUsingTimestamping(provider, sig_out, pubkey, &leaf_hash, nullptr, sigversion, dataHashPointer)) {
+    if (creator.CreateSchnorrSigUsingTimestamping(provider, sig_out, pubkey, &leaf_hash, nullptr, sigversion, stealthFactorPointer, dataHashPointer)) {
         sigdata.taproot_script_sigs[lookup_key] = sig_out;
         return true;
     }
@@ -319,7 +319,7 @@ static bool SignTaprootScript(const SigningProvider& provider, const BaseSignatu
     return false;
 }
 
-static bool SignTaprootScriptUsingTimestamping(const SigningProvider& provider, const BaseSignatureCreator& creator, SignatureData& sigdata, int leaf_version, Span<const unsigned char> script_bytes, std::vector<valtype>& result, const unsigned char* dataHashPointer)
+static bool SignTaprootScriptUsingTimestamping(const SigningProvider& provider, const BaseSignatureCreator& creator, SignatureData& sigdata, int leaf_version, Span<const unsigned char> script_bytes, std::vector<valtype>& result, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer)
 {
     // Only BIP342 tapscript signing is supported for now.
     if (leaf_version != TAPROOT_LEAF_TAPSCRIPT) return false;
@@ -332,7 +332,7 @@ static bool SignTaprootScriptUsingTimestamping(const SigningProvider& provider, 
     if (script.size() == 34 && script[33] == OP_CHECKSIG && script[0] == 0x20) {
         XOnlyPubKey pubkey{Span{script}.subspan(1, 32)};
         std::vector<unsigned char> sig;
-        if (CreateTaprootScriptSigUsingTimestamping(creator, sigdata, provider, sig, pubkey, leaf_hash, sigversion, dataHashPointer)) {
+        if (CreateTaprootScriptSigUsingTimestamping(creator, sigdata, provider, sig, pubkey, leaf_hash, sigversion, stealthFactorPointer, dataHashPointer)) {
             result = Vector(std::move(sig));
             return true;
         }
@@ -346,7 +346,7 @@ static bool SignTaprootScriptUsingTimestamping(const SigningProvider& provider, 
         for (size_t i = 0; i < match->second.size(); ++i) {
             XOnlyPubKey pubkey{*(match->second.rbegin() + i)};
             std::vector<unsigned char> sig;
-            bool good_sig = CreateTaprootScriptSigUsingTimestamping(creator, sigdata, provider, sig, pubkey, leaf_hash, sigversion, dataHashPointer);
+            bool good_sig = CreateTaprootScriptSigUsingTimestamping(creator, sigdata, provider, sig, pubkey, leaf_hash, sigversion, stealthFactorPointer, dataHashPointer);
             if (good_sig && good_sigs < match->first) {
                 ++good_sigs;
                 sigs.push_back(std::move(sig));
@@ -426,7 +426,7 @@ static bool SignTaproot(const SigningProvider& provider, const BaseSignatureCrea
     return false;
 }
 
-static bool SignTaprootUsingTimestamping(const SigningProvider& provider, const BaseSignatureCreator& creator, const WitnessV1Taproot& output, SignatureData& sigdata, std::vector<valtype>& result, const unsigned char* dataHashPointer)
+static bool SignTaprootUsingTimestamping(const SigningProvider& provider, const BaseSignatureCreator& creator, const WitnessV1Taproot& output, SignatureData& sigdata, std::vector<valtype>& result, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer)
 {
     TaprootSpendData spenddata;
     TaprootBuilder builder;
@@ -451,12 +451,12 @@ static bool SignTaprootUsingTimestamping(const SigningProvider& provider, const 
 
         std::vector<unsigned char> sig;
         if (sigdata.taproot_key_path_sig.size() == 0) {
-            if (creator.CreateSchnorrSigUsingTimestamping(provider, sig, sigdata.tr_spenddata.internal_key, nullptr, &sigdata.tr_spenddata.merkle_root, SigVersion::TAPROOT, dataHashPointer)) {
+            if (creator.CreateSchnorrSigUsingTimestamping(provider, sig, sigdata.tr_spenddata.internal_key, nullptr, &sigdata.tr_spenddata.merkle_root, SigVersion::TAPROOT, stealthFactorPointer, dataHashPointer)) {
                 sigdata.taproot_key_path_sig = sig;
             }
         }
         if (sigdata.taproot_key_path_sig.size() == 0) {
-            if (creator.CreateSchnorrSigUsingTimestamping(provider, sig, output, nullptr, nullptr, SigVersion::TAPROOT, dataHashPointer)) {
+            if (creator.CreateSchnorrSigUsingTimestamping(provider, sig, output, nullptr, nullptr, SigVersion::TAPROOT, stealthFactorPointer, dataHashPointer)) {
                 sigdata.taproot_key_path_sig = sig;
             }
         }
@@ -471,7 +471,7 @@ static bool SignTaprootUsingTimestamping(const SigningProvider& provider, const 
     for (const auto& [key, control_blocks] : sigdata.tr_spenddata.scripts) {
         const auto& [script, leaf_ver] = key;
         std::vector<std::vector<unsigned char>> result_stack;
-        if (SignTaprootScriptUsingTimestamping(provider, creator, sigdata, leaf_ver, script, result_stack, dataHashPointer)) {
+        if (SignTaprootScriptUsingTimestamping(provider, creator, sigdata, leaf_ver, script, result_stack, stealthFactorPointer, dataHashPointer)) {
             result_stack.emplace_back(std::begin(script), std::end(script)); // Push the script
             result_stack.push_back(*control_blocks.begin()); // Push the smallest control block
             if (smallest_result_stack.size() == 0 ||
@@ -652,7 +652,7 @@ static bool SignStepUsingTimestamping(const SigningProvider& provider, const Bas
             return false;
 
         case TxoutType::WITNESS_V1_TAPROOT:
-            return SignTaprootUsingTimestamping(provider, creator, WitnessV1Taproot(XOnlyPubKey{vSolutions[0]}), sigdata, ret, dataHashPointer);
+            return SignTaprootUsingTimestamping(provider, creator, WitnessV1Taproot(XOnlyPubKey{vSolutions[0]}), sigdata, ret, stealthFactorPointer, dataHashPointer);
     } // no default case, so the compiler can warn about missing cases
     assert(false);
 }
@@ -1108,7 +1108,7 @@ public:
         sig.assign(64, '\000');
         return true;
     }
-    bool CreateSchnorrSigUsingTimestamping(const SigningProvider& provider, std::vector<unsigned char>& sig, const XOnlyPubKey& pubkey, const uint256* leaf_hash, const uint256* tweak, SigVersion sigversion, const unsigned char* dataHashPointer) const override
+    bool CreateSchnorrSigUsingTimestamping(const SigningProvider& provider, std::vector<unsigned char>& sig, const XOnlyPubKey& pubkey, const uint256* leaf_hash, const uint256* tweak, SigVersion sigversion, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) const override
     {
         sig.assign(64, '\000');
         return true;

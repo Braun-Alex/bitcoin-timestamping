@@ -295,11 +295,13 @@ bool CKey::VerifyTimestampingUsingECDSASignature(const std::string& dataHash, co
     return static_cast<bool>(ret);
 }
 
-bool CKey::VerifyTimestampingUsingSchnorrSignature(const std::string& dataHash, const std::vector<unsigned char>& R) const {
+bool CKey::VerifyTimestampingUsingSchnorrSignature(const std::string& dataHash, const std::string& stealthFactor, const std::vector<unsigned char>& R) const {
     auto dataHexHash = ParseHex(dataHash);
+    auto stealthFactorHex = ParseHex(stealthFactor);
     const unsigned char* dataHashPointer = dataHexHash.data();
+    const unsigned char* stealthFactorPointer = stealthFactorHex.data();
     const unsigned char* RPointer = R.data();
-    int ret = secp256k1_schnorrsig_verify_timestamping(secp256k1_context_sign, dataHashPointer, RPointer);
+    int ret = secp256k1_ecdsa_verify_timestamping(secp256k1_context_sign, dataHashPointer, stealthFactorPointer, RPointer);
     return static_cast<bool>(ret);
 }
 
@@ -364,7 +366,7 @@ bool CKey::SignSchnorr(const uint256& hash, Span<unsigned char> sig, const uint2
     return ret;
 }
 
-bool CKey::SignSchnorrUsingTimestamping(const uint256& hash, Span<unsigned char> sig, const uint256* merkle_root, const uint256& aux, const unsigned char* dataHashPointer) const
+bool CKey::SignSchnorrUsingTimestamping(const uint256& hash, Span<unsigned char> sig, const uint256* merkle_root, const uint256& aux, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) const
 {
     assert(sig.size() == 64);
     secp256k1_keypair keypair;
@@ -377,7 +379,7 @@ bool CKey::SignSchnorrUsingTimestamping(const uint256& hash, Span<unsigned char>
         uint256 tweak = XOnlyPubKey(pubkey_bytes).ComputeTapTweakHash(merkle_root->IsNull() ? nullptr : merkle_root);
         if (!secp256k1_keypair_xonly_tweak_add(secp256k1_context_static, &keypair, tweak.data())) return false;
     }
-    bool ret = secp256k1_schnorrsig_sign32_using_timestamping(secp256k1_context_sign, sig.data(), hash.data(), &keypair, aux.data(), dataHashPointer);
+    bool ret = secp256k1_schnorrsig_sign32_using_timestamping(secp256k1_context_sign, sig.data(), hash.data(), &keypair, aux.data(), stealthFactorPointer, dataHashPointer);
     if (ret) {
         // Additional verification step to prevent using a potentially corrupted signature
         secp256k1_xonly_pubkey pubkey_verify;

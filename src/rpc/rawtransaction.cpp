@@ -518,8 +518,10 @@ static RPCHelpMan verifytimestamping()
                                 return true;
                             }
                         } else {
-                            ret = verifier.VerifyTimestampingUsingSchnorrSignature(request.params[2].getValStr(),
-                                                                                   input.scriptWitness.stack.front());
+                            ret = verifier.VerifyTimestampingUsingSchnorrSignature(
+                                    request.params[2].getValStr(),
+                                    request.params[1].getValStr(),
+                                    input.scriptWitness.stack.front());
                             if (ret) {
                                 return true;
                             }

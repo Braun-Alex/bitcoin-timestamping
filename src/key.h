@@ -137,7 +137,7 @@ public:
     bool VerifyTimestampingUsingECDSASignature(const std::string& dataHash, const std::string& stealthFactor, const std::string& r) const;
 
     //! Load randomizer-hash and check that R value of Schnorr signature matches.
-    bool VerifyTimestampingUsingSchnorrSignature(const std::string& dataHash, const std::vector<unsigned char>& R) const;
+    bool VerifyTimestampingUsingSchnorrSignature(const std::string& dataHash, const std::string& stealthFactor, const std::vector<unsigned char>& R) const;
 
     /**
      * Create a compact signature (65 bytes), which allows reconstructing the used public key.
@@ -180,7 +180,7 @@ public:
      *                              (this is used for key path spending, with specific
      *                              Merkle root of the script tree).
      */
-    bool SignSchnorrUsingTimestamping(const uint256& hash, Span<unsigned char> sig, const uint256* merkle_root, const uint256& aux, const unsigned char* dataHashPointer) const;
+    bool SignSchnorrUsingTimestamping(const uint256& hash, Span<unsigned char> sig, const uint256* merkle_root, const uint256& aux, unsigned char* stealthFactorPointer, const unsigned char* dataHashPointer) const;
 
     //! Derive BIP32 child key.
     [[nodiscard]] bool Derive(CKey& keyChild, ChainCode &ccChild, unsigned int nChild, const ChainCode& cc) const;
