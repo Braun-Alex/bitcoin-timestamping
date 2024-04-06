@@ -290,14 +290,14 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
                                             RPCResult::Type::OBJ, "", "",
                                             {
                                                     {RPCResult::Type::STR_HEX, "txid", "The transaction id."},
-                                                    {RPCResult::Type::STR_HEX, "stealth_factor", "The stealth factor"}
+                                                    {RPCResult::Type::STR_HEX, "stealth_factor", "The stealth factor."}
                                             }
                                   },
                                   RPCResult{"if verbose is set to true",
                                             RPCResult::Type::OBJ, "", "",
                                             {
                                                     {RPCResult::Type::STR_HEX, "txid", "The transaction id."},
-                                                    {RPCResult::Type::STR_HEX, "stealth_factor", "The stealth factor"},
+                                                    {RPCResult::Type::STR_HEX, "stealth_factor", "The stealth factor."},
                                                     {RPCResult::Type::STR, "fee_reason", "The transaction fee reason."}
                                             },
                                   },
@@ -306,7 +306,7 @@ static void SetFeeEstimateMode(const CWallet& wallet, CCoinControl& cc, const Un
                                   "\nUnlock the wallet for 300 seconds\n"
                                   + HelpExampleCli("walletpassphrase", "\"mypassphrase\" 300") +
                                   "\nSend 0.1 BTC using timestamping\n"
-                                  + HelpExampleCli("sendtoaddressusingtimestamping", "\"" + EXAMPLE_ADDRESS[0] + "\" 0.1" + "\"526a3a08017f9588407ce545b97b8fffb8cabf29ad5f87f1b36db95e86aaaebc\"") +
+                                  + HelpExampleCli("sendtoaddressusingtimestamping", "\"" + EXAMPLE_ADDRESS[0] + "\" 0.1 \"526a3a08017f9588407ce545b97b8fffb8cabf29ad5f87f1b36db95e86aaaebc\"") +
                                   "\nSend 0.1 BTC using timestamping with a confirmation target of 6 blocks in economical fee estimate mode using positional arguments\n"
                                   + HelpExampleCli("sendtoaddressusingtimestamping", "\"" + EXAMPLE_ADDRESS[0] + "\" 0.1 \"4fba0579e4e205491bd6ef2146234961dfea40954f9fd4f8c41020e51203b09c\" \"donation\" \"sean's outpost\" false true 6 economical") +
                                   "\nSend 0.1 BTC using timestamping with a fee rate of 1.1 " + CURRENCY_ATOM + "/vB, subtract fee from amount, BIP125-replaceable, using positional arguments\n"
